@@ -1,0 +1,128 @@
+{
+  "ui": {},
+  "main_page": {
+    "entities": [
+      {
+        "COLLECTION": {
+          "id": "f96b380b-c491-4d53-a752-b0a5c3fb157d",
+          "name": "Collection 1",
+          "description": "Description for Collection 1",
+          "requests": [
+            {
+              "id": "26bf3c3f-ad78-4d43-93a3-967df9605508",
+              "name": "request to yandex",
+              "protocol": "HTTPS",
+              "method": "GET",
+              "uri": "ya.ru",
+              "headers": [
+                {
+                  "key": "Host",
+                  "value": "developer.mozilla.org"
+                },
+                {
+                  "key": "User-Agent",
+                  "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
+                },
+                {
+                  "key": "Upgrade-Insecure-Requests",
+                  "value": 1
+                },
+                {
+                  "key": "fake-bool",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "id": "10a69d33-1cb6-4d8b-8031-e9c30312168c",
+              "name": "request to google",
+              "protocol": "HTTPS",
+              "method": "GET",
+              "uri": "google.ru",
+              "headers": [
+                {
+                  "key": "Host",
+                  "value": "developer.mozilla.org"
+                },
+                {
+                  "key": "User-Agent",
+                  "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
+                },
+                {
+                  "key": "Upgrade-Insecure-Requests",
+                  "value": 1
+                },
+                {
+                  "key": "fake-bool",
+                  "value": true
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "COLLECTION": {
+          "id": "809af82e-6a0f-423a-a368-fd90b6ac4848",
+          "name": "Collection 2",
+          "description": "Description for Collection 2",
+          "requests": [
+            {
+              "id": "0f00eda8-65c2-44dd-902e-41bc3e90ed8d",
+              "name": "request to microsoft",
+              "protocol": "HTTPS",
+              "method": "GET",
+              "uri": "microsoft.ru",
+              "headers": [
+                {
+                  "key": "Host",
+                  "value": "developer.mozilla.org"
+                },
+                {
+                  "key": "User-Agent",
+                  "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
+                },
+                {
+                  "key": "Upgrade-Insecure-Requests",
+                  "value": 1
+                },
+                {
+                  "key": "fake-bool",
+                  "value": true
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "REQUEST": {
+          "id": "84fa9280-13b9-41f7-bd51-204362b65d6f",
+          "name": "request to mail",
+          "protocol": "HTTPS",
+          "method": "GET",
+          "uri": "mail.ru",
+          "headers": [
+            {
+              "key": "Host",
+              "value": "developer.mozilla.org"
+            },
+            {
+              "key": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
+            },
+            {
+              "key": "Upgrade-Insecure-Requests",
+              "value": 1
+            },
+            {
+              "key": "fake-bool",
+              "value": true
+            }
+          ]
+        }
+      }
+    ]
+  }
+}}
+}
