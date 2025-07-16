@@ -7,6 +7,7 @@ use std::{
 
 use chrono::{DateTime, Local};
 
+use eframe::glow::NONE;
 use serde_json::Value;
 use tokio_tungstenite::tungstenite::Utf8Bytes;
 
@@ -115,6 +116,41 @@ impl Request {
             self.original.copy_from_other(&self.draft);
         }
     }
+
+    /// Check if filter string could be applied here
+    pub fn is_filtered(&self, filter: &String) -> bool {
+        if self
+            .draft
+            .name
+            .to_lowercase()
+            .contains(&filter.to_lowercase())
+            || self
+                .draft
+                .body
+                .to_lowercase()
+                .contains(&filter.to_lowercase())
+            || self
+                .draft
+                .protocol
+                .to_string()
+                .to_lowercase()
+                .contains(&filter.to_lowercase())
+            || self
+                .draft
+                .method
+                .to_string()
+                .to_lowercase()
+                .contains(&filter.to_lowercase())
+            || self
+                .draft
+                .uri
+                .to_lowercase()
+                .contains(&filter.to_lowercase())
+        {
+            return true;
+        }
+        false
+    }
 }
 
 /// Collection Entity representation
@@ -164,6 +200,24 @@ impl Collection {
             self.is_changed = false;
             self.original.copy_from_other(&self.draft);
         }
+    }
+
+    /// Check if filter string could be applied here
+    pub fn is_filtered(&self, filter: &String) -> bool {
+        if self
+            .draft
+            .name
+            .to_lowercase()
+            .contains(&filter.to_lowercase())
+            || self
+                .draft
+                .description
+                .to_lowercase()
+                .contains(&filter.to_lowercase())
+        {
+            return true;
+        }
+        false
     }
 }
 
@@ -579,6 +633,7 @@ pub enum ResponseView {
     HEADERS,
 }
 
+/// Representation of indexes of filtered entity - collection or request
 #[derive(Debug, Clone)]
 pub enum FilteredEntity {
     COLLECTION {
@@ -586,15 +641,43 @@ pub enum FilteredEntity {
         request_idxs: Vec<usize>,
     },
     REQUEST {
-        reqeust_idx: usize,
+        request_idx: usize,
     },
 }
 
+impl FilteredEntity {
+    /// Creating filtered collection entity
+    pub fn collection(index: usize) -> Self {
+        Self::COLLECTION {
+            collection_idx: index,
+            request_idxs: vec![],
+        }
+    }
+
+    // Pushing request id to Self if Self is Collection
+    pub fn push_request(&mut self, index: usize) {
+        match self {
+            FilteredEntity::COLLECTION {
+                collection_idx: _,
+                request_idxs,
+            } => request_idxs.push(index),
+            FilteredEntity::REQUEST { request_idx: _ } => return,
+        }
+    }
+
+    // Creating filtered request entity
+    pub fn request(index: usize) -> Self {
+        Self::REQUEST { request_idx: index }
+    }
+}
+
+/// List of filtered entities
 #[derive(Debug, Clone)]
 pub struct FilteredEntities {
     pub items: Vec<FilteredEntity>,
 }
 
+/// From Vec of Entities to Filtered Entities indexes
 impl From<&Vec<Entity>> for FilteredEntities {
     fn from(value: &Vec<Entity>) -> Self {
         let mut items = vec![];
@@ -604,10 +687,77 @@ impl From<&Vec<Entity>> for FilteredEntities {
                     collection_idx: i,
                     request_idxs: (0..collection.requests.len()).collect(),
                 }),
-                Entity::REQUEST(_) => items.push(FilteredEntity::REQUEST { reqeust_idx: i }),
+                Entity::REQUEST(_) => items.push(FilteredEntity::REQUEST { request_idx: i }),
             }
         }
         Self { items }
+    }
+}
+
+impl FilteredEntities {
+    pub fn new() -> Self {
+        Self { items: vec![] }
+    }
+
+    /// Push to current list collection-like entity with index
+    pub fn push_collection(&mut self, index: usize) {
+        self.items.push(FilteredEntity::collection(index));
+    }
+
+    /// Push to current list request-like entity with index
+    /// Collection index not mandatory. If request on root levelv - collection idx is None
+    pub fn push_request(&mut self, request_index: usize, collection_idx: Option<usize>) {
+        match collection_idx {
+            Some(c_idx) => match self.items.get_mut(c_idx) {
+                Some(filtered_entity) => match filtered_entity {
+                    FilteredEntity::COLLECTION {
+                        collection_idx: _,
+                        request_idxs,
+                    } => request_idxs.push(request_index),
+                    FilteredEntity::REQUEST { request_idx: _ } => return,
+                },
+                None => {
+                    let mut collection = FilteredEntity::collection(c_idx);
+                    collection.push_request(request_index);
+                    self.items.push(collection);
+                }
+            },
+            None => {
+                self.items.push(FilteredEntity::request(request_index));
+            }
+        }
+    }
+
+    /// Receiving all root level entities indexes
+    pub fn root_entities_idxs(&self) -> Vec<usize> {
+        self.items
+            .iter()
+            .map(|value| match value {
+                FilteredEntity::COLLECTION {
+                    collection_idx,
+                    request_idxs: _,
+                } => collection_idx.clone(),
+                FilteredEntity::REQUEST { request_idx } => request_idx.clone(),
+            })
+            .collect()
+    }
+
+    /// Receiving all request indexes from collection with index
+    pub fn collection_requests_idxs(&self, requested_collection_idx: usize) -> Option<Vec<usize>> {
+        for entity in &self.items {
+            match entity {
+                FilteredEntity::COLLECTION {
+                    collection_idx,
+                    request_idxs,
+                } => {
+                    if *collection_idx == requested_collection_idx {
+                        return Some(request_idxs.clone());
+                    }
+                }
+                FilteredEntity::REQUEST { request_idx: _ } => {}
+            }
+        }
+        None
     }
 }
 
@@ -801,19 +951,39 @@ impl MainPage {
         };
     }
 
-    pub fn filter_entities(&mut self) {
-        // for i in 0..self.entities.len() {
-        //     match &self.entities[i] {
-        //         Entity::COLLECTION(collection) => {
-        //             if collection.draft.name.contains(&self.filter_text)
-        //                 || collection.draft.description.contains(&self.filter_text)
-        //             {
-        //                 self.filtered_entities.push(i);
-        //             }
-        //         }
-        //         Entity::REQUEST(request) => todo!(),
-        //     }
-        // }
+    pub fn apply_filter(&mut self) {
+        if self.filter_text == "" {
+            self.filtered_entities = FilteredEntities::from(&self.entities);
+            return;
+        };
+        let mut filtered_entities = FilteredEntities::new();
+        for entity_idx in 0..self.entities.len() {
+            match &self.entities[entity_idx] {
+                Entity::COLLECTION(collection) => {
+                    if collection.is_filtered(&self.filter_text) {
+                        filtered_entities.push_collection(entity_idx);
+                    }
+
+                    for request_idx in 0..collection.requests.len() {
+                        if collection.requests[request_idx].is_filtered(&self.filter_text) {
+                            filtered_entities.push_request(request_idx, Some(entity_idx));
+                        }
+                    }
+                }
+                Entity::REQUEST(request) => {
+                    if request.is_filtered(&self.filter_text) {
+                        filtered_entities.push_request(entity_idx, None);
+                    }
+                }
+            }
+        }
+        println!("{:?}", filtered_entities);
+        self.filtered_entities = filtered_entities;
+    }
+
+    pub fn drop_filter(&mut self) {
+        self.filter_text = "".into();
+        self.apply_filter();
     }
 }
 

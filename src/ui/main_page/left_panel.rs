@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use egui::{
-    text::LayoutJob, vec2, Align, Color32, Context, FontFamily, FontId, FontSelection, Frame,
-    Layout, RichText, ScrollArea, SidePanel, TextEdit, TextFormat, TextStyle, Ui, WidgetText,
+    text::LayoutJob, vec2, Align, Button, Color32, Context, CornerRadius, FontFamily, FontId,
+    FontSelection, Frame, Key, Layout, RichText, ScrollArea, SidePanel, Stroke, TextEdit,
+    TextFormat, TextStyle, Ui, WidgetText,
 };
 
 use crate::{
@@ -37,6 +38,12 @@ impl LeftPanel {
                             let _ = ui.button("Collection");
                         });
 
+                        ui.style_mut().visuals.widgets.active.corner_radius = CornerRadius::ZERO;
+                        ui.style_mut().visuals.widgets.inactive.corner_radius = CornerRadius::ZERO;
+                        ui.style_mut().visuals.widgets.hovered.corner_radius = CornerRadius::ZERO;
+                        ui.style_mut().visuals.widgets.noninteractive.corner_radius =
+                            CornerRadius::ZERO;
+
                         let filter_textedit =
                             TextEdit::singleline(&mut states.main_page.filter_text)
                                 .hint_text(WidgetText::RichText(Arc::new(
@@ -47,8 +54,30 @@ impl LeftPanel {
                                 )))
                                 .text_color(states.style.color_main())
                                 .char_limit(50)
-                                .font(FontSelection::FontId(FontId::proportional(15.)));
-                        ui.add(filter_textedit)
+                                .font(FontSelection::FontId(FontId::proportional(15.)))
+                                .desired_width(ui.available_width() - 29.);
+
+                        ui.style_mut().spacing.item_spacing = vec2(1., 0.);
+
+                        if ui.add(filter_textedit).lost_focus()
+                            && ctx.input(|i| i.key_pressed(Key::Enter))
+                        {
+                            states.main_page.apply_filter();
+                        };
+
+                        ui.style_mut().spacing.button_padding = vec2(6., 4.);
+
+                        if ui
+                            .add(
+                                Button::new("X")
+                                    .corner_radius(CornerRadius::ZERO)
+                                    .fill(states.style.color_light())
+                                    .stroke(Stroke::default()),
+                            )
+                            .clicked()
+                        {
+                            states.main_page.drop_filter();
+                        }
                     });
                 });
                 ui.add_space(5.);
@@ -63,7 +92,7 @@ impl LeftPanel {
                             Frame::default().show(ui, |ui| {
                                 ui.style_mut().spacing.button_padding = vec2(0., 5.);
 
-                                for i in 0..states.main_page.entities.len() {
+                                for i in states.main_page.filtered_entities.root_entities_idxs() {
                                     VisualEntity::new().update(ui, i, states);
                                     ui.separator();
                                 }
@@ -89,11 +118,13 @@ impl VisualEntity {
                     .selected_entity
                     .collection_is_selected(entity_idx);
 
+                // Apply visual mark on changes
                 let collection_text = if collection.is_changed {
                     &format!("{} *", &collection.original.name)
                 } else {
                     &collection.original.name
                 };
+
                 let collection_folder_response = ui.selectable_label(
                     is_selected,
                     self.get_collection_text(!collection.is_folded, &collection_text),
@@ -109,8 +140,19 @@ impl VisualEntity {
                     collection.is_folded = !collection.is_folded;
                 }
 
+                let requests_idxs = states
+                    .main_page
+                    .filtered_entities
+                    .collection_requests_idxs(entity_idx);
+
+                if requests_idxs.is_none() {
+                    return;
+                };
+
+                let requests_idxs = requests_idxs.unwrap();
+
                 if !collection.is_folded {
-                    for request_idx in 0..collection.requests.len() {
+                    for request_idx in requests_idxs {
                         let is_selected = states
                             .main_page
                             .selected_entity
