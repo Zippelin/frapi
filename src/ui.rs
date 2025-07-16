@@ -1,7 +1,7 @@
+use eframe::Frame;
 use egui::{Context, Key};
 
 use crate::{
-    settings::Settings,
     states::States,
     ui::{main_menu::MainMenu, main_page::MainPage},
 };
@@ -26,9 +26,8 @@ impl UI {
         }
     }
 
-    pub fn update(&mut self, ctx: &Context) {
+    pub fn update(&mut self, ctx: &Context, frame: &mut Frame) {
         self.main_menu.update(ctx, &mut self.states);
-
         match self.states.current_page {
             crate::states::Page::MAIN => self.main_page.update(ctx, &mut self.states),
         }

@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use egui::{
-    text::LayoutJob, vec2, Align, Color32, Context, FontFamily, FontId, Frame, Layout, ScrollArea,
-    SidePanel, TextFormat, Ui,
+    text::LayoutJob, vec2, Align, Color32, Context, FontFamily, FontId, FontSelection, Frame,
+    Layout, RichText, ScrollArea, SidePanel, TextEdit, TextFormat, TextStyle, Ui, WidgetText,
 };
 
 use crate::{
@@ -28,12 +30,25 @@ impl LeftPanel {
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.group(|ui| {
+                        ui.style_mut().spacing.button_padding = vec2(10., 10.);
                         ui.menu_button("New", |ui| {
+                            ui.style_mut().spacing.button_padding = vec2(10., 10.);
                             let _ = ui.button("Request");
                             let _ = ui.button("Collection");
                         });
 
-                        ui.text_edit_singleline(&mut states.main_page.filter_text)
+                        let filter_textedit =
+                            TextEdit::singleline(&mut states.main_page.filter_text)
+                                .hint_text(WidgetText::RichText(Arc::new(
+                                    RichText::new("filter")
+                                        .color(states.style.color_secondary())
+                                        .monospace()
+                                        .size(15.),
+                                )))
+                                .text_color(states.style.color_main())
+                                .char_limit(50)
+                                .font(FontSelection::FontId(FontId::proportional(15.)));
+                        ui.add(filter_textedit)
                     });
                 });
                 ui.add_space(5.);

@@ -579,11 +579,43 @@ pub enum ResponseView {
     HEADERS,
 }
 
+#[derive(Debug, Clone)]
+pub enum FilteredEntity {
+    COLLECTION {
+        collection_idx: usize,
+        request_idxs: Vec<usize>,
+    },
+    REQUEST {
+        reqeust_idx: usize,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct FilteredEntities {
+    pub items: Vec<FilteredEntity>,
+}
+
+impl From<&Vec<Entity>> for FilteredEntities {
+    fn from(value: &Vec<Entity>) -> Self {
+        let mut items = vec![];
+        for i in 0..value.len() {
+            match &value[i] {
+                Entity::COLLECTION(collection) => items.push(FilteredEntity::COLLECTION {
+                    collection_idx: i,
+                    request_idxs: (0..collection.requests.len()).collect(),
+                }),
+                Entity::REQUEST(_) => items.push(FilteredEntity::REQUEST { reqeust_idx: i }),
+            }
+        }
+        Self { items }
+    }
+}
+
 /// Main Page States
 #[derive(Debug, Clone)]
 pub struct MainPage {
     pub entities: Vec<Entity>,
-    pub filtered_entities: Vec<usize>,
+    pub filtered_entities: FilteredEntities,
     pub selected_entity: SelectedEntity,
     pub filter_text: String,
     pub style: Style,
@@ -597,7 +629,7 @@ impl From<&Settings> for MainPage {
             entities.push(Entity::from(entity));
         }
         Self {
-            filtered_entities: (0..entities.len()).collect(),
+            filtered_entities: FilteredEntities::from(&entities),
             entities,
             selected_entity: SelectedEntity::new(),
             style: Style::from(&value.ui),
@@ -767,6 +799,21 @@ impl MainPage {
                 Entity::REQUEST(_request) => {}
             }
         };
+    }
+
+    pub fn filter_entities(&mut self) {
+        // for i in 0..self.entities.len() {
+        //     match &self.entities[i] {
+        //         Entity::COLLECTION(collection) => {
+        //             if collection.draft.name.contains(&self.filter_text)
+        //                 || collection.draft.description.contains(&self.filter_text)
+        //             {
+        //                 self.filtered_entities.push(i);
+        //             }
+        //         }
+        //         Entity::REQUEST(request) => todo!(),
+        //     }
+        // }
     }
 }
 

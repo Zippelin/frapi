@@ -35,8 +35,7 @@ impl Frapi {
 
 impl App for Frapi {
     fn update(&mut self, ctx: &Context, frame: &mut Frame) {
-        let _ = frame;
-        self.ui.update(ctx);
+        self.ui.update(ctx, frame);
     }
 }
 

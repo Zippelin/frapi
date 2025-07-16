@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use egui::{
     text::LayoutJob, vec2, Align, Button, CollapsingHeader, Color32, FontFamily, FontId, Frame,
     Label, Layout, RichText, ScrollArea, TextEdit, TextFormat, Ui, WidgetText,
@@ -77,11 +79,11 @@ impl JsonView {
                             //
                             match &response.data.json.complex {
                                 Value::Object(map) => {
-                                    CollapsingHeader::new(WidgetText::RichText(
+                                    CollapsingHeader::new(WidgetText::RichText(Arc::new(
                                         RichText::new("[root object]")
                                             .color(Color32::LIGHT_GRAY)
                                             .size(11.),
-                                    ))
+                                    )))
                                     .default_open(true)
                                     .id_salt(format!("{:#?}", map))
                                     .show(ui, |ui| {
@@ -337,7 +339,7 @@ impl JsonView {
                 ..Default::default()
             },
         );
-        Label::new(WidgetText::LayoutJob(job))
+        Label::new(WidgetText::LayoutJob(Arc::new(job)))
     }
 
     fn label_for_straight_value(&self, text: &String) -> Label {
@@ -362,7 +364,7 @@ impl JsonView {
             },
         );
 
-        Label::new(WidgetText::LayoutJob(job))
+        Label::new(WidgetText::LayoutJob(Arc::new(job)))
     }
 
     fn label_for_index(&self, index: &usize) -> Label {
@@ -387,7 +389,7 @@ impl JsonView {
             },
         );
 
-        Label::new(WidgetText::LayoutJob(job))
+        Label::new(WidgetText::LayoutJob(Arc::new(job)))
     }
 
     fn label_for_key(&self, text: &String) -> Label {
@@ -428,7 +430,7 @@ impl JsonView {
                 ..Default::default()
             },
         );
-        Label::new(WidgetText::LayoutJob(job))
+        Label::new(WidgetText::LayoutJob(Arc::new(job)))
     }
 
     fn label_for_obj_key(&self, text: &String) -> WidgetText {
@@ -480,7 +482,7 @@ impl JsonView {
             },
         );
 
-        WidgetText::LayoutJob(job)
+        WidgetText::LayoutJob(Arc::new(job))
     }
 
     fn label_for_vec_key(&self, text: &String) -> WidgetText {
@@ -531,6 +533,6 @@ impl JsonView {
                 ..Default::default()
             },
         );
-        WidgetText::LayoutJob(job)
+        WidgetText::LayoutJob(Arc::new(job))
     }
 }
