@@ -1,3 +1,4 @@
+/// Executro engine for reqeusting or keep sessions for requests
 use std::{
     sync::{Arc, Mutex},
     time::Duration,
@@ -16,9 +17,13 @@ use tokio_tungstenite::connect_async;
 
 use crate::{
     settings::{Method, Protocol},
-    states::main_page::{Header, RequestData, Response},
+    states::{
+        main_page::{Header, RequestData, Response},
+        Events,
+    },
 };
 
+/// Executor stares
 #[derive(PartialEq, Clone, Debug)]
 pub enum State {
     FREE,
@@ -26,21 +31,28 @@ pub enum State {
     CONNECTED,
 }
 
+/// Message for queue between main thread and executor thread
 #[derive(Debug)]
 pub enum Message {
+    /// command for executor to execute
     COMMAND(Command),
+    /// executor response
+    /// usualy executor dont respond and wrinting directly to responses vec
     RESULT(Result),
 }
 
 impl Message {
+    /// Execute command with payload
     pub fn execute(data: &RequestData) -> Self {
         Message::COMMAND(data.into())
     }
 
+    /// Terminate currently executing process
     pub fn terminate() -> Self {
         Message::COMMAND(Command::termiate())
     }
 
+    /// Get Self as Command
     pub fn get_command(self) -> Option<Command> {
         match self {
             Message::COMMAND(command) => Some(command),
@@ -48,6 +60,7 @@ impl Message {
         }
     }
 
+    /// Get Self as Result
     pub fn get_result(self) -> Option<Result> {
         match self {
             Message::COMMAND(_) => None,
@@ -56,18 +69,23 @@ impl Message {
     }
 }
 
+/// From ReqeustData payload -> queue message
 impl From<&RequestData> for Message {
     fn from(value: &RequestData) -> Self {
         Message::COMMAND(value.into())
     }
 }
 
+/// Command to execute on executor
 #[derive(Debug)]
 pub enum Command {
+    /// make reqeust with payload
     EXECUTE(CommandExecute),
+    /// terminate currently pending job
     TERRMINATE,
 }
 
+/// from ReqeustData payload -> command to execute
 impl From<&RequestData> for Command {
     fn from(value: &RequestData) -> Self {
         Self::EXECUTE(value.into())
@@ -75,18 +93,23 @@ impl From<&RequestData> for Command {
 }
 
 impl Command {
+    /// Get Command as execute
     pub fn execute(data: &RequestData) -> Self {
         Self::EXECUTE(data.into())
     }
 
+    // Get Command as termiate
     pub fn termiate() -> Self {
         Self::TERRMINATE
     }
 }
 
+/// Executor result
+/// Currently dont use
 #[derive(Debug)]
 pub struct Result {}
 
+/// Command to execute on executor
 #[derive(Debug)]
 pub struct CommandExecute {
     pub uri: String,
@@ -96,6 +119,7 @@ pub struct CommandExecute {
     pub body: String,
 }
 
+/// From RequestData -> command to execute on executor
 impl From<&RequestData> for CommandExecute {
     fn from(value: &RequestData) -> Self {
         let headers = value
@@ -116,10 +140,14 @@ impl From<&RequestData> for CommandExecute {
     }
 }
 
-#[derive(Debug)]
+/// Executor engine
+#[derive(Debug, Clone)]
 pub struct Executor {
+    /// current executor state
     pub state: Arc<Mutex<State>>,
+    /// vec or responses for current reqeust
     responses: Arc<Mutex<Vec<Response>>>,
+    /// channel to throw commands from main thread to executor thread
     channel_sender: Option<Sender<Message>>,
 }
 
@@ -132,48 +160,70 @@ impl Executor {
         }
     }
 
-    pub fn execute(&mut self, data: &RequestData) {
+    /// execute action based on payload
+    pub fn execute(&mut self, data: &RequestData, events: Arc<Mutex<Events>>) {
         let message: Message = data.into();
 
         let state = match self.state.lock() {
             Ok(state) => (*state).clone(),
             Err(err) => {
-                println!("Error: Could not get mutex of Executor State: {err}");
+                events.lock().unwrap().event_error(&format!(
+                    "Error: Could not get mutex of Executor State: {err}"
+                ));
                 return;
             }
         };
 
+        // If executor connected == currently websocket session going on
+        // Passing message to session
+        // In usual way you cant pass data with protocol other than Websocket without termination connection
+        // This must be guaranted by UI
         if state == State::CONNECTED {
+            events.lock().unwrap().event_info(&format!(
+                "Detected connected websocket session, sending request..."
+            ));
             self.send_ws(message);
             return;
         }
 
+        // If executor is free and requested usual HTTP request
         if state == State::FREE
             && (data.protocol == Protocol::HTTP || data.protocol == Protocol::HTTPS)
         {
+            events
+                .lock()
+                .unwrap()
+                .event_info(&format!("Detected free executor, sending http request..."));
             *self.state.lock().unwrap() = State::BUSY;
             if let Some(command) = message.get_command() {
-                self.execute_http(command);
+                self.execute_http(command, events);
             }
 
             return;
         }
 
+        // if executor is free and requested usual Weebsocket connecrtion
         if state == State::FREE && (data.protocol == Protocol::WS || data.protocol == Protocol::WSS)
         {
+            events.lock().unwrap().event_info(&format!(
+                "Detected free executor, sending websocket request..."
+            ));
             *self.state.lock().unwrap() = State::CONNECTED;
             if let Some(command) = message.get_command() {
-                self.connect_ws(command);
+                self.connect_ws(command, events);
             }
 
             return;
         }
     }
+
+    /// Terminate currently pending requests, if any
     pub fn terminate(&mut self) {
         if self.channel_sender.is_none() {
             *self.state.lock().unwrap() = State::FREE;
             return;
         };
+
         let _ = self
             .channel_sender
             .as_mut()
@@ -182,21 +232,25 @@ impl Executor {
         *self.state.lock().unwrap() = State::FREE;
     }
 
-    fn execute_http(&mut self, message: Command) {
+    /// Spawn separate thread for http reqeusts
+    fn execute_http(&mut self, message: Command, events: Arc<Mutex<Events>>) {
         let (sender, receiver) = channel::<Message>(100);
         self.channel_sender = Some(sender);
-        let responses = Arc::clone(&self.responses);
+
         tokio::spawn(Self::http_thread(
             message,
-            responses,
+            Arc::clone(&self.responses),
+            Arc::clone(&events),
             receiver,
             self.state.clone(),
         ));
     }
 
+    /// Thread for http requests
     async fn http_thread(
         message: Command,
         responses: Arc<Mutex<Vec<Response>>>,
+        events: Arc<Mutex<Events>>,
         mut command_channel: Receiver<Message>,
         executor_state: Arc<Mutex<State>>,
     ) {
@@ -209,8 +263,32 @@ impl Executor {
                         .send()
                         .await;
                     let response = match result {
-                        Ok(val) => Response::from_http_response(val).await,
-                        Err(err) => Response::from_http_error(err).await,
+                        Ok(val) => match Response::from_http_response(val).await {
+                            Ok(r) => {
+                                events
+                                    .lock()
+                                    .unwrap()
+                                    .event_info(&format!("Received success response"));
+                                r
+                            }
+                            Err((r, err)) => {
+                                events.lock().unwrap().event_error(&err);
+                                r
+                            }
+                        },
+                        Err(err) => match Response::from_http_error(err).await {
+                            Ok(r) => {
+                                events
+                                    .lock()
+                                    .unwrap()
+                                    .event_info(&format!("Received success error response"));
+                                r
+                            }
+                            Err((r, err)) => {
+                                events.lock().unwrap().event_error(&err);
+                                r
+                            }
+                        },
                     };
 
                     match responses.lock() {
@@ -218,7 +296,9 @@ impl Executor {
                             r.push(response);
                             return;
                         }
-                        Err(_err) => return,
+                        Err(_) => {
+                            return;
+                        }
                     };
                 };
 
@@ -245,24 +325,29 @@ impl Executor {
         }
     }
 
-    fn connect_ws(&mut self, message: Command) {
+    /// Spawn separate thread for websocket
+    fn connect_ws(&mut self, message: Command, events: Arc<Mutex<Events>>) {
         let (sender, receiver) = channel::<Message>(100);
         self.channel_sender = Some(sender);
 
         tokio::spawn(Self::ws_thread(
             message,
             Arc::clone(&self.responses),
+            Arc::clone(&events),
             receiver,
             self.state.clone(),
         ));
     }
 
+    /// Thread for websocket requests
     async fn ws_thread(
         command: Command,
         responses: Arc<Mutex<Vec<Response>>>,
+        events: Arc<Mutex<Events>>,
         mut command_channel: Receiver<Message>,
         executor_state: Arc<Mutex<State>>,
     ) {
+        let _ = events;
         match command {
             Command::EXECUTE(command_execute) => {
                 let uri = format!("{}://{}", command_execute.protocol, command_execute.uri);
@@ -349,6 +434,7 @@ impl Executor {
         }
     }
 
+    /// Send command to queue
     fn send_ws(&mut self, message: Message) {
         if self.channel_sender.is_none() {
             *self.state.lock().unwrap() = State::FREE;

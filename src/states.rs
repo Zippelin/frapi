@@ -1,33 +1,236 @@
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
+
+use chrono::{DateTime, Local};
+use egui::Color32;
+
 use crate::{
-    settings::{Settings, UISettings},
-    states::main_page::MainPage,
+    settings::{Options as SettingsOptions, Settings, UISettings, UITheme},
+    states::main_page::{Entity, MainPage},
+    ui::colors::ThemeColors,
 };
 
 pub mod main_page;
 
-pub struct Pages {
-    pub current: Page,
+pub struct States {
+    pub current_page: Page,
     pub main_page: MainPage,
+    pub style: Style,
+    pub options: Options,
+    pub events: Arc<Mutex<Events>>,
 }
 
-impl From<&Settings> for Pages {
+impl From<&Settings> for States {
     fn from(value: &Settings) -> Self {
         Self {
-            current: Page::MAIN,
+            current_page: Page::MAIN,
             main_page: MainPage::from(value),
+            style: Style::from(&value.ui),
+            options: Options::from(&value.options),
+            events: Arc::new(Mutex::new(Events::new())),
         }
     }
 }
 
-#[derive(Debug)]
-pub struct Style {}
+impl States {
+    pub fn event_info(&mut self, msg: &String) {
+        self.events.lock().unwrap().event_info(msg);
+    }
+
+    pub fn event_warning(&mut self, msg: &String) {
+        self.events.lock().unwrap().event_warning(msg);
+    }
+
+    pub fn event_error(&mut self, msg: &String) {
+        self.events.lock().unwrap().event_error(msg);
+    }
+
+    pub fn clear_events(&mut self) {
+        self.events.lock().unwrap().clear_events();
+    }
+
+    pub fn on_save_complete(&mut self) {
+        for i in 0..self.main_page.entities.len() {
+            match &mut self.main_page.entities[i] {
+                Entity::COLLECTION(collection) => collection.on_save(),
+                Entity::REQUEST(request) => request.on_save(),
+            }
+        }
+    }
+
+    /// Load settigns from path.
+    /// Replace partialy currrent states
+    pub fn load(&mut self, file_path: Option<PathBuf>) {
+        let settings = match Settings::dyn_load(file_path) {
+            Ok(val) => val,
+            Err(err) => {
+                println!("{}", err);
+                self.event_error(&err);
+                return;
+            }
+        };
+
+        let new_states: Self = Self::from(&settings);
+        self.style = new_states.style;
+        self.options = new_states.options;
+        self.main_page = new_states.main_page;
+    }
+
+    pub fn save(&mut self, save_to_path: Option<PathBuf>) {
+        match Settings::from(&*self).save(save_to_path) {
+            Ok(_) => {
+                self.event_info(&"Settings save complete successful".into());
+                self.on_save_complete();
+            }
+            Err(err) => self.event_error(&err),
+        };
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Theme {
+    Light(ThemeColors),
+    Dark(ThemeColors),
+}
+
+#[derive(Debug, Clone)]
+pub struct Style {
+    pub theme: Theme,
+}
 
 impl From<&UISettings> for Style {
     fn from(value: &UISettings) -> Self {
-        Self {}
+        let theme = match value.theme {
+            UITheme::Light => Theme::Light(ThemeColors::light()),
+            UITheme::Dark => Theme::Dark(ThemeColors::dark()),
+        };
+        Self { theme }
+    }
+}
+
+impl Style {
+    pub fn color_main(&self) -> Color32 {
+        match &self.theme {
+            Theme::Light(theme_colors) => theme_colors.main,
+            Theme::Dark(theme_colors) => theme_colors.main,
+        }
+    }
+
+    pub fn color_secondary(&self) -> Color32 {
+        match &self.theme {
+            Theme::Light(theme_colors) => theme_colors.secondary,
+            Theme::Dark(theme_colors) => theme_colors.secondary,
+        }
+    }
+
+    pub fn color_danger(&self) -> Color32 {
+        match &self.theme {
+            Theme::Light(theme_colors) => theme_colors.danger,
+            Theme::Dark(theme_colors) => theme_colors.danger,
+        }
+    }
+
+    pub fn color_light(&self) -> Color32 {
+        match &self.theme {
+            Theme::Light(theme_colors) => theme_colors.light,
+            Theme::Dark(theme_colors) => theme_colors.light,
+        }
+    }
+
+    pub fn color_lighter(&self) -> Color32 {
+        match &self.theme {
+            Theme::Light(theme_colors) => theme_colors.lighter,
+            Theme::Dark(theme_colors) => theme_colors.lighter,
+        }
+    }
+
+    pub fn color_success(&self) -> Color32 {
+        match &self.theme {
+            Theme::Light(theme_colors) => theme_colors.success,
+            Theme::Dark(theme_colors) => theme_colors.success,
+        }
+    }
+
+    pub fn color_warning(&self) -> Color32 {
+        match &self.theme {
+            Theme::Light(theme_colors) => theme_colors.warning,
+            Theme::Dark(theme_colors) => theme_colors.warning,
+        }
     }
 }
 
 pub enum Page {
     MAIN,
+}
+
+pub struct Options {}
+
+impl From<&SettingsOptions> for Options {
+    fn from(value: &SettingsOptions) -> Self {
+        let _ = value;
+        // TODO: make convertion from settigns options to state options
+        Self {}
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Events {
+    items: Vec<Event>,
+}
+
+impl Events {
+    pub fn new() -> Self {
+        Self { items: vec![] }
+    }
+    pub fn event_info(&mut self, msg: &String) {
+        self.items.push(Event::info(msg));
+    }
+
+    pub fn event_warning(&mut self, msg: &String) {
+        self.items.push(Event::warning(msg));
+    }
+
+    pub fn event_error(&mut self, msg: &String) {
+        self.items.push(Event::error(msg));
+    }
+
+    pub fn clear_events(&mut self) {
+        self.items.clear();
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Event {
+    Info(EventData),
+    Warning(EventData),
+    Error(EventData),
+}
+
+impl Event {
+    pub fn info(msg: &String) -> Self {
+        Self::Info(EventData {
+            message: msg.clone(),
+            timestamp: Local::now(),
+        })
+    }
+    pub fn warning(msg: &String) -> Self {
+        Self::Warning(EventData {
+            message: msg.clone(),
+            timestamp: Local::now(),
+        })
+    }
+    pub fn error(msg: &String) -> Self {
+        Self::Error(EventData {
+            message: msg.clone(),
+            timestamp: Local::now(),
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EventData {
+    pub message: String,
+    pub timestamp: DateTime<Local>,
 }

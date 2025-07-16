@@ -1,22 +1,46 @@
-use crate::{settings::Settings, states::Pages};
+use eframe::App;
+use eframe::Frame;
+use egui::Context;
+
+use crate::{settings::Settings, states::States, ui::UI};
 
 pub mod executor;
 pub mod settings;
 pub mod states;
+pub mod ui;
 
 pub struct Frapi {
-    settings: Settings,
-    pages: Pages,
+    ui: UI,
 }
 
 impl Frapi {
     pub fn new() -> Self {
         let settings = Settings::load();
-        let pages = Pages::from(&settings);
-        Self { settings, pages }
+        let states = States::from(&settings);
+        let ui = UI::new(states);
+        Self { ui }
+    }
+
+    pub fn run() {
+        let options = eframe::NativeOptions {
+            viewport: egui::ViewportBuilder::default()
+                .with_inner_size([800.0, 800.0])
+                .with_min_inner_size([800.0, 600.]),
+            ..Default::default()
+        };
+
+        let _ = eframe::run_native("FrAPI", options, Box::new(|_| Ok(Box::new(Self::new()))));
     }
 }
 
-fn main() {
-    println!("Hello, world!");
+impl App for Frapi {
+    fn update(&mut self, ctx: &Context, frame: &mut Frame) {
+        let _ = frame;
+        self.ui.update(ctx);
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    Frapi::run();
 }

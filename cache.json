@@ -1,15 +1,45 @@
 {
-  "ui": {},
+  "ui": {
+    "theme": "Dark"
+  },
   "main_page": {
     "entities": [
       {
+        "REQUEST": {
+          "id": "d938fa5d-e1ee-4de6-ae94-fb81acf5f090",
+          "name": "request to firebase",
+          "protocol": "HTTPS",
+          "method": "GET",
+          "uri": "vue-backend-mocker-default-rtdb.europe-west1.firebasedatabase.app/surveys.json",
+          "headers": [
+            {
+              "key": "Host",
+              "value": "developer.mozilla.org"
+            },
+            {
+              "key": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
+            },
+            {
+              "key": "Upgrade-Insecure-Requests",
+              "value": 1
+            },
+            {
+              "key": "fake-bool",
+              "value": true
+            }
+          ],
+          "body": ""
+        }
+      },
+      {
         "COLLECTION": {
-          "id": "f96b380b-c491-4d53-a752-b0a5c3fb157d",
+          "id": "58a325a8-ea48-49b7-87fa-c9d1581e9c27",
           "name": "Collection 1",
           "description": "Description for Collection 1",
           "requests": [
             {
-              "id": "26bf3c3f-ad78-4d43-93a3-967df9605508",
+              "id": "b50bf7d9-bfd3-4e90-8a71-95fa5cf52e50",
               "name": "request to yandex",
               "protocol": "HTTPS",
               "method": "GET",
@@ -31,10 +61,11 @@
                   "key": "fake-bool",
                   "value": true
                 }
-              ]
+              ],
+              "body": ""
             },
             {
-              "id": "10a69d33-1cb6-4d8b-8031-e9c30312168c",
+              "id": "3e551b2d-c10c-48a4-a54f-89105d82930a",
               "name": "request to google",
               "protocol": "HTTPS",
               "method": "GET",
@@ -56,19 +87,20 @@
                   "key": "fake-bool",
                   "value": true
                 }
-              ]
+              ],
+              "body": ""
             }
           ]
         }
       },
       {
         "COLLECTION": {
-          "id": "809af82e-6a0f-423a-a368-fd90b6ac4848",
+          "id": "1becdc39-f24b-4c73-8264-0e32da14b439",
           "name": "Collection 2",
           "description": "Description for Collection 2",
           "requests": [
             {
-              "id": "0f00eda8-65c2-44dd-902e-41bc3e90ed8d",
+              "id": "a8a2cc1b-45fe-457b-af33-79a5b03ef4ef",
               "name": "request to microsoft",
               "protocol": "HTTPS",
               "method": "GET",
@@ -90,14 +122,15 @@
                   "key": "fake-bool",
                   "value": true
                 }
-              ]
+              ],
+              "body": ""
             }
           ]
         }
       },
       {
         "REQUEST": {
-          "id": "84fa9280-13b9-41f7-bd51-204362b65d6f",
+          "id": "f8e18500-5a19-4b8d-8847-7ff1eed25962",
           "name": "request to mail",
           "protocol": "HTTPS",
           "method": "GET",
@@ -119,10 +152,11 @@
               "key": "fake-bool",
               "value": true
             }
-          ]
+          ],
+          "body": ""
         }
       }
     ]
-  }
-}}
+  },
+  "options": {}
 }
