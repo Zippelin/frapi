@@ -36,82 +36,7 @@ impl RequestDetailsPanel {
         )
         .show_inside(ui, |ui| {
             ui.with_layout(Layout::top_down_justified(Align::LEFT), |ui| {
-                let mut header_text = LayoutJob::default();
-                header_text.append(
-                    "Request Details",
-                    0.,
-                    TextFormat {
-                        color: Color32::DARK_GRAY,
-                        font_id: FontId::new(15.0, FontFamily::Monospace),
-
-                        ..Default::default()
-                    },
-                );
-                ui.horizontal(|ui| {
-                    ui.add(Label::new(header_text).selectable(false));
-
-                    ui.add_space(ui.available_width() - 135.);
-
-                    ui.group(|ui| {
-                        ui.style_mut().spacing.button_padding = vec2(10., 10.);
-                        let entity_is_changed = states.main_page.entity_is_changed();
-                        if ui
-                            .add(
-                                Button::new(WidgetText::RichText(Arc::new(
-                                    RichText::new("cancel")
-                                        .color(if entity_is_changed {
-                                            Color32::WHITE
-                                        } else {
-                                            states.style.color_main()
-                                        })
-                                        .size(13.)
-                                        .monospace(),
-                                )))
-                                .sense(if entity_is_changed {
-                                    Sense::click()
-                                } else {
-                                    Sense::empty()
-                                })
-                                .fill(if entity_is_changed {
-                                    states.style.color_danger()
-                                } else {
-                                    states.style.color_secondary()
-                                }),
-                            )
-                            .clicked()
-                        {
-                            states.main_page.cancel_changes_of_selected_entity();
-                        };
-                        if ui
-                            .add(
-                                Button::new(WidgetText::RichText(Arc::new(
-                                    RichText::new("save")
-                                        .color(if entity_is_changed {
-                                            Color32::WHITE
-                                        } else {
-                                            states.style.color_main()
-                                        })
-                                        .monospace()
-                                        .size(13.),
-                                )))
-                                .sense(if entity_is_changed {
-                                    Sense::click()
-                                } else {
-                                    Sense::empty()
-                                })
-                                .fill(if entity_is_changed {
-                                    states.style.color_success()
-                                } else {
-                                    states.style.color_secondary()
-                                }),
-                            )
-                            .clicked()
-                        {
-                            states.save_selected(None);
-                        };
-                    });
-                });
-
+                self.update_header(ui, states);
                 self.update_path(ui, states);
                 self.update_url(ui, states);
                 self.update_headers(ui, states);
@@ -274,6 +199,84 @@ impl RequestDetailsPanel {
                         }
                     }
                 });
+            });
+        });
+    }
+
+    fn update_header(&self, ui: &mut Ui, states: &mut States) {
+        let mut header_text = LayoutJob::default();
+        header_text.append(
+            "Request Details",
+            0.,
+            TextFormat {
+                color: Color32::DARK_GRAY,
+                font_id: FontId::new(15.0, FontFamily::Monospace),
+
+                ..Default::default()
+            },
+        );
+        ui.horizontal(|ui| {
+            ui.add(Label::new(header_text).selectable(false));
+
+            ui.add_space(ui.available_width() - 135.);
+
+            ui.group(|ui| {
+                ui.style_mut().spacing.button_padding = vec2(10., 10.);
+                let entity_is_changed = states.main_page.entity_is_changed();
+                if ui
+                    .add(
+                        Button::new(WidgetText::RichText(Arc::new(
+                            RichText::new("cancel")
+                                .color(if entity_is_changed {
+                                    Color32::WHITE
+                                } else {
+                                    states.style.color_main()
+                                })
+                                .size(13.)
+                                .monospace(),
+                        )))
+                        .sense(if entity_is_changed {
+                            Sense::click()
+                        } else {
+                            Sense::empty()
+                        })
+                        .fill(if entity_is_changed {
+                            states.style.color_danger()
+                        } else {
+                            states.style.color_secondary()
+                        }),
+                    )
+                    .clicked()
+                {
+                    states.main_page.cancel_changes_of_selected_entity();
+                };
+                if ui
+                    .add(
+                        Button::new(WidgetText::RichText(Arc::new(
+                            RichText::new("save")
+                                .color(if entity_is_changed {
+                                    Color32::WHITE
+                                } else {
+                                    states.style.color_main()
+                                })
+                                .monospace()
+                                .size(13.),
+                        )))
+                        .sense(if entity_is_changed {
+                            Sense::click()
+                        } else {
+                            Sense::empty()
+                        })
+                        .fill(if entity_is_changed {
+                            states.style.color_success()
+                        } else {
+                            states.style.color_secondary()
+                        }),
+                    )
+                    .clicked()
+                {
+                    states.save_selected(None);
+                };
             });
         });
     }

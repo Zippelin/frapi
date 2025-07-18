@@ -61,6 +61,32 @@
                 }
               ],
               "body": ""
+            },
+            {
+              "id": "f8e18500-5a19-4b8d-8847-7ff1eed25962",
+              "name": "request to mail",
+              "protocol": "HTTPS",
+              "method": "GET",
+              "uri": "mail.ru",
+              "headers": [
+                {
+                  "key": "Host",
+                  "value": "developer.mozilla.org"
+                },
+                {
+                  "key": "User-Agent",
+                  "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
+                },
+                {
+                  "key": "Upgrade-Insecure-Requests",
+                  "value": 1
+                },
+                {
+                  "key": "fake-bool",
+                  "value": true
+                }
+              ],
+              "body": ""
             }
           ]
         }
@@ -102,39 +128,11 @@
       },
       {
         "REQUEST": {
-          "id": "f8e18500-5a19-4b8d-8847-7ff1eed25962",
-          "name": "request to mail",
-          "protocol": "HTTPS",
-          "method": "GET",
-          "uri": "mail.ru",
-          "headers": [
-            {
-              "key": "Host",
-              "value": "developer.mozilla.org"
-            },
-            {
-              "key": "User-Agent",
-              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
-            },
-            {
-              "key": "Upgrade-Insecure-Requests",
-              "value": 1
-            },
-            {
-              "key": "fake-bool",
-              "value": true
-            }
-          ],
-          "body": ""
-        }
-      },
-      {
-        "REQUEST": {
           "id": "d938fa5d-e1ee-4de6-ae94-fb81acf5f090",
           "name": "request to firebase",
           "protocol": "HTTPS",
           "method": "GET",
-          "uri": "vue-backend-mocker-default-rtdb123.europe-west1.firebasedatabase.app/surveys.json",
+          "uri": "vue-backend-mocker-default-rtdb.europe-west1.firebasedatabase.app//surveys.json",
           "headers": [
             {
               "key": "Host",

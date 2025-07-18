@@ -52,7 +52,7 @@ impl ResponsesListPanel {
                         .max_height(ui.available_height() - 10.)
                         .show(ui, |ui| {
                             Frame::new().inner_margin(Margin::same(10)).show(ui, |ui| {
-                                for i in 0..responses.len() {
+                                for i in (0..responses.len()).rev() {
                                     self.update_response(ui, &mut responses[i], &states.style);
                                     ui.separator();
                                 }

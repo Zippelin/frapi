@@ -2,11 +2,12 @@ use std::sync::Arc;
 
 use egui::{
     text::LayoutJob, vec2, Align, Button, Color32, Context, CornerRadius, FontFamily, FontId,
-    FontSelection, Frame, Key, Layout, Response, RichText, ScrollArea, SelectableLabel, SidePanel,
-    Stroke, TextEdit, TextFormat, Ui, Widget, WidgetText,
+    FontSelection, Frame, Key, Label, Layout, Margin, Response, RichText, ScrollArea,
+    SelectableLabel, Sense, SidePanel, Stroke, TextEdit, TextFormat, Ui, Widget, WidgetText,
 };
 
 use crate::{
+    settings::{Method, Protocol},
     states::{
         main_page::{Collection, Entity, Request, SelectedEntity},
         States, Style,
@@ -155,6 +156,7 @@ impl VisualEntity {
                         collection_text,
                         states.style.clone(),
                     );
+
                 if fold_btn_resp.clicked() {
                     collection.is_folded = !collection.is_folded;
                 };
@@ -183,30 +185,37 @@ impl VisualEntity {
                 let requests_idxs = requests_idxs.unwrap();
 
                 if !collection.is_folded {
-                    for request_idx in requests_idxs {
-                        let is_selected = states
-                            .main_page
-                            .selected_entity
-                            .request_is_selected(Some(entity_idx), request_idx);
+                    Frame::new()
+                        .fill(states.style.color_secondary())
+                        .show(ui, |ui| {
+                            ui.indent(format!("collection-{}-reqeusts", entity_idx), |ui| {
+                                for request_idx in requests_idxs {
+                                    let is_selected = states
+                                        .main_page
+                                        .selected_entity
+                                        .request_is_selected(Some(entity_idx), request_idx);
 
-                        ui.indent(format!("entity-{}-{}", entity_idx, request_idx), |ui| {
-                            if ui
-                                .selectable_label(
-                                    is_selected,
-                                    self.get_request_text(
-                                        is_selected,
-                                        &collection.requests[request_idx],
-                                    ),
-                                )
-                                .clicked()
-                            {
-                                states
-                                    .main_page
-                                    .selected_entity
-                                    .select_request(Some(entity_idx), request_idx);
-                            };
+                                    let request = &collection.requests[request_idx];
+
+                                    let (request_btn_resp, request_delete_resp) = self
+                                        .update_request_entity(
+                                            ui,
+                                            &request.draft.name,
+                                            &request.draft.method,
+                                            &request.draft.protocol,
+                                            request.is_changed,
+                                            is_selected,
+                                            states.style.clone(),
+                                        );
+                                    if request_btn_resp.clicked() {
+                                        states
+                                            .main_page
+                                            .selected_entity
+                                            .select_request(Some(entity_idx), request_idx);
+                                    };
+                                }
+                            });
                         });
-                    }
                 }
             }
             Entity::REQUEST(request) => {
@@ -215,21 +224,90 @@ impl VisualEntity {
                     .selected_entity
                     .request_is_selected(None, entity_idx);
 
-                if ui
-                    .selectable_label(is_selected, self.get_request_text(is_selected, &request))
-                    .clicked()
-                {
+                // TODO: add deletion of requests
+                let (request_btn_resp, request_delete_resp) = self.update_request_entity(
+                    ui,
+                    &request.draft.name,
+                    &request.draft.method,
+                    &request.draft.protocol,
+                    request.is_changed,
+                    is_selected,
+                    states.style.clone(),
+                );
+
+                if request_btn_resp.clicked() {
                     states
                         .main_page
                         .selected_entity
                         .select_request(None, entity_idx);
-                };
+                }
             }
         };
 
+        // If marked lovaly for delettion - transfer to global.
+        // Later on this deletion will be processes in this frame.
         if entity_for_deletion.is_selected() {
             states.main_page.deletion_entity = entity_for_deletion;
         }
+    }
+
+    /// Draw request  item
+    /// Return tuplet: (folder_tbn, delete_btn) of responses
+    fn update_request_entity(
+        &self,
+        ui: &mut Ui,
+        request_text: &String,
+        method: &Method,
+        protocol: &Protocol,
+        is_changed: bool,
+        is_selected: bool,
+        style: Style,
+    ) -> (Response, Response) {
+        ui.with_layout(Layout::top_down_justified(Align::LEFT), |ui| {
+            ui.horizontal(|ui| {
+                ui.style_mut().spacing.item_spacing = vec2(0., 0.);
+                ui.style_mut().spacing.button_padding = vec2(5., 8.);
+                let request_details_text = self.get_request_details_text(method, protocol);
+                let request_text = self.get_request_text(is_changed, request_text);
+
+                Frame::new()
+                    .inner_margin(Margin::symmetric(5, 8))
+                    .fill(style.color_light())
+                    .show(ui, |ui| {
+                        ui.add(
+                            Label::new(request_details_text)
+                                .selectable(false)
+                                .halign(Align::RIGHT),
+                        );
+                    });
+
+                // Separate layout so inner text could align left
+                let request_btn_response = ui
+                    .with_layout(Layout::top_down(Align::LEFT), |ui| {
+                        // Button selectable of collection
+                        let request_btn = Button::selectable(is_selected, request_text)
+                            .min_size(vec2(ui.available_width() - 30., 15.))
+                            .corner_radius(CornerRadius::ZERO);
+                        let request_btn_response = ui.add(request_btn);
+                        return request_btn_response;
+                    })
+                    .inner;
+
+                ui.style_mut().spacing.button_padding = vec2(5., 8.);
+                // Delete Button
+                let delete_btn_response = ui.add(
+                    Button::new(WidgetText::RichText(Arc::new(
+                        RichText::new(Icon::delete()).strong().color(Color32::WHITE),
+                    )))
+                    .fill(style.color_danger())
+                    .corner_radius(CornerRadius::ZERO),
+                );
+
+                return (request_btn_response, delete_btn_response);
+            })
+        })
+        .inner
+        .inner
     }
 
     /// Draw collection folder item
@@ -263,15 +341,20 @@ impl VisualEntity {
 
                     ui.style_mut().spacing.button_padding = vec2(5., 7.);
 
-                    // Button selectable of collection
-                    let collection_folder = Button::selectable(
-                        is_selected,
-                        self.get_collection_text(!is_folded, &collection_text),
-                    )
-                    .corner_radius(CornerRadius::ZERO)
-                    .min_size(vec2(ui.available_size().x - 30., 15.));
+                    let collection_folder_response = ui
+                        .with_layout(Layout::top_down(Align::LEFT), |ui| {
+                            // Button selectable of collection
+                            let collection_folder = Button::selectable(
+                                is_selected,
+                                self.get_collection_text(!is_folded, &collection_text),
+                            )
+                            .corner_radius(CornerRadius::ZERO)
+                            .min_size(vec2(ui.available_size().x - 30., 15.));
 
-                    let collection_folder_response = ui.add(collection_folder);
+                            let collection_folder_response = ui.add(collection_folder);
+                            return collection_folder_response;
+                        })
+                        .inner;
 
                     // Delete Button
                     let delete_btn_response = ui.add(
@@ -293,17 +376,16 @@ impl VisualEntity {
         .inner
     }
 
-    /// Painted request item text
-    fn get_request_text(&self, is_selected: bool, request: &Request) -> LayoutJob {
-        let _ = is_selected;
+    /// Painted request details text
+    fn get_request_details_text(&self, method: &Method, protocol: &Protocol) -> LayoutJob {
         let mut job = LayoutJob::default();
         job.break_on_newline = true;
 
         job.append(
             &format!(
-                "  {}\n  {}  ",
-                &request.draft.protocol.to_string().to_uppercase(),
-                &request.draft.method.to_string().to_uppercase()
+                "{}\n{}",
+                protocol.to_string().to_uppercase(),
+                method.to_string().to_uppercase()
             ),
             0.,
             TextFormat {
@@ -313,15 +395,22 @@ impl VisualEntity {
                 ..Default::default()
             },
         );
+        job
+    }
 
-        let request_text = if request.is_changed {
-            &format!("{} *", &request.draft.name)
+    /// Painted request item text
+    fn get_request_text(&self, is_changed: bool, request_text: &String) -> LayoutJob {
+        let mut job = LayoutJob::default();
+
+        let request_text = if is_changed {
+            &format!("{} *", request_text)
         } else {
-            &request.draft.name
+            request_text
         };
+
         job.append(
             &request_text,
-            5.,
+            0.,
             TextFormat {
                 color: Color32::LIGHT_GRAY,
                 font_id: FontId::new(13.0, FontFamily::Proportional),
@@ -333,6 +422,7 @@ impl VisualEntity {
 
     /// Painted collection item text
     fn get_collection_text(&self, is_selected: bool, text: &String) -> LayoutJob {
+        let _ = is_selected;
         let mut job = LayoutJob::default();
 
         // let icon = if is_selected {
