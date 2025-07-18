@@ -16,4 +16,7 @@ impl Icon {
     pub fn triangle_bottom() -> String {
         "▼".into()
     }
+    pub fn delete() -> String {
+        "✖".into()
+    }
 }

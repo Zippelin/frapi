@@ -2,14 +2,14 @@ use std::sync::Arc;
 
 use egui::{
     text::LayoutJob, vec2, Align, Button, Color32, Context, CornerRadius, FontFamily, FontId,
-    FontSelection, Frame, Key, Layout, RichText, ScrollArea, SidePanel, Stroke, TextEdit,
-    TextFormat, TextStyle, Ui, WidgetText,
+    FontSelection, Frame, Key, Layout, Response, RichText, ScrollArea, SelectableLabel, SidePanel,
+    Stroke, TextEdit, TextFormat, Ui, Widget, WidgetText,
 };
 
 use crate::{
     states::{
-        main_page::{Entity, Request},
-        States,
+        main_page::{Collection, Entity, Request, SelectedEntity},
+        States, Style,
     },
     ui::icons::Icon,
 };
@@ -34,8 +34,27 @@ impl LeftPanel {
                         ui.style_mut().spacing.button_padding = vec2(10., 10.);
                         ui.menu_button("New", |ui| {
                             ui.style_mut().spacing.button_padding = vec2(10., 10.);
-                            let _ = ui.button("Request");
-                            let _ = ui.button("Collection");
+
+                            if ui.button("Request").clicked() {
+                                let (collection_idx, request_idx) = states.main_page.new_request();
+                                if let Some(c_idx) = collection_idx {
+                                    states.main_page.set_collection_fold_state(c_idx, false);
+                                };
+                                states
+                                    .main_page
+                                    .selected_entity
+                                    .select_request(collection_idx, request_idx);
+                                states.main_page.drop_filter();
+                            };
+
+                            if ui.button("Collection").clicked() {
+                                let new_collection_idx = states.main_page.new_collection();
+                                states
+                                    .main_page
+                                    .selected_entity
+                                    .select_collection(new_collection_idx);
+                                states.main_page.drop_filter();
+                            };
                         });
 
                         ui.style_mut().visuals.widgets.active.corner_radius = CornerRadius::ZERO;
@@ -82,7 +101,7 @@ impl LeftPanel {
                 });
                 ui.add_space(5.);
 
-                // Список сущностей
+                // Entities list
                 ui.with_layout(Layout::top_down_justified(Align::LEFT), |ui| {
                     ui.style_mut().spacing.scroll.bar_outer_margin = 2.;
 
@@ -111,6 +130,9 @@ impl VisualEntity {
     }
 
     pub fn update(&self, ui: &mut Ui, entity_idx: usize, states: &mut States) {
+        // Mark for deletion after all updates done adn data freed from ownership
+        let mut entity_for_deletion = SelectedEntity::new();
+
         match &mut states.main_page.entities[entity_idx] {
             Entity::COLLECTION(collection) => {
                 let is_selected = states
@@ -120,25 +142,34 @@ impl VisualEntity {
 
                 // Apply visual mark on changes
                 let collection_text = if collection.is_changed {
-                    &format!("{} *", &collection.original.name)
+                    &format!("{} *", &collection.draft.name)
                 } else {
-                    &collection.original.name
+                    &collection.draft.name
                 };
 
-                let collection_folder_response = ui.selectable_label(
-                    is_selected,
-                    self.get_collection_text(!collection.is_folded, &collection_text),
-                );
-                if collection_folder_response.clicked() {
+                let (fold_btn_resp, folder_btn_resp, delete_btn_resp) = self
+                    .update_collection_entity(
+                        ui,
+                        collection.is_folded,
+                        is_selected,
+                        collection_text,
+                        states.style.clone(),
+                    );
+                if fold_btn_resp.clicked() {
+                    collection.is_folded = !collection.is_folded;
+                };
+                if folder_btn_resp.clicked() {
                     states
                         .main_page
                         .selected_entity
                         .select_collection(entity_idx);
                 };
-
-                if collection_folder_response.double_clicked() {
+                if folder_btn_resp.double_clicked() {
                     collection.is_folded = !collection.is_folded;
-                }
+                };
+                if delete_btn_resp.clicked() {
+                    entity_for_deletion.select_collection(entity_idx);
+                };
 
                 let requests_idxs = states
                     .main_page
@@ -195,9 +226,74 @@ impl VisualEntity {
                 };
             }
         };
+
+        if entity_for_deletion.is_selected() {
+            states.main_page.deletion_entity = entity_for_deletion;
+        }
     }
 
-    /// paint request item text
+    /// Draw collection folder item
+    /// Return tuplet: (fold_btn, folder_tbn, delete_btn) of responses
+    fn update_collection_entity(
+        &self,
+        ui: &mut Ui,
+        is_folded: bool,
+        is_selected: bool,
+        collection_text: &String,
+        style: Style,
+    ) -> (Response, Response, Response) {
+        ui.with_layout(Layout::top_down_justified(Align::LEFT), |ui| {
+            return ui
+                .horizontal(|ui| {
+                    ui.style_mut().spacing.item_spacing = vec2(0., 0.);
+                    ui.style_mut().spacing.button_padding = vec2(5., 8.);
+
+                    // Folding Button
+                    let fold_btn_response = ui.add(
+                        Button::new(if is_folded {
+                            WidgetText::RichText(Arc::new(RichText::new(Icon::triangle_right())))
+                                .monospace()
+                        } else {
+                            WidgetText::RichText(Arc::new(RichText::new(Icon::triangle_bottom())))
+                                .monospace()
+                        })
+                        .fill(style.color_main())
+                        .corner_radius(CornerRadius::ZERO),
+                    );
+
+                    ui.style_mut().spacing.button_padding = vec2(5., 7.);
+
+                    // Button selectable of collection
+                    let collection_folder = Button::selectable(
+                        is_selected,
+                        self.get_collection_text(!is_folded, &collection_text),
+                    )
+                    .corner_radius(CornerRadius::ZERO)
+                    .min_size(vec2(ui.available_size().x - 30., 15.));
+
+                    let collection_folder_response = ui.add(collection_folder);
+
+                    // Delete Button
+                    let delete_btn_response = ui.add(
+                        Button::new(WidgetText::RichText(Arc::new(
+                            RichText::new(Icon::delete()).strong().color(Color32::WHITE),
+                        )))
+                        .fill(style.color_danger())
+                        .corner_radius(CornerRadius::ZERO),
+                    );
+
+                    return (
+                        fold_btn_response,
+                        collection_folder_response,
+                        delete_btn_response,
+                    );
+                })
+                .inner;
+        })
+        .inner
+    }
+
+    /// Painted request item text
     fn get_request_text(&self, is_selected: bool, request: &Request) -> LayoutJob {
         let _ = is_selected;
         let mut job = LayoutJob::default();
@@ -206,8 +302,8 @@ impl VisualEntity {
         job.append(
             &format!(
                 "  {}\n  {}  ",
-                &request.original.protocol.to_string().to_uppercase(),
-                &request.original.method.to_string().to_uppercase()
+                &request.draft.protocol.to_string().to_uppercase(),
+                &request.draft.method.to_string().to_uppercase()
             ),
             0.,
             TextFormat {
@@ -218,13 +314,13 @@ impl VisualEntity {
             },
         );
 
-        let reqeust_text = if request.is_changed {
-            &format!("{} *", &request.original.name)
+        let request_text = if request.is_changed {
+            &format!("{} *", &request.draft.name)
         } else {
-            &request.original.name
+            &request.draft.name
         };
         job.append(
-            &reqeust_text,
+            &request_text,
             5.,
             TextFormat {
                 color: Color32::LIGHT_GRAY,
@@ -235,24 +331,24 @@ impl VisualEntity {
         job
     }
 
-    /// paint collection item text
+    /// Painted collection item text
     fn get_collection_text(&self, is_selected: bool, text: &String) -> LayoutJob {
         let mut job = LayoutJob::default();
 
-        let icon = if is_selected {
-            &Icon::folder_open()
-        } else {
-            &Icon::folder_closed()
-        };
-        job.append(
-            icon,
-            10.,
-            TextFormat {
-                color: Color32::LIGHT_GRAY,
-                font_id: FontId::new(15.0, FontFamily::Proportional),
-                ..Default::default()
-            },
-        );
+        // let icon = if is_selected {
+        //     &Icon::folder_open()
+        // } else {
+        //     &Icon::folder_closed()
+        // };
+        // job.append(
+        //     icon,
+        //     10.,
+        //     TextFormat {
+        //         color: Color32::LIGHT_GRAY,
+        //         font_id: FontId::new(15.0, FontFamily::Proportional),
+        //         ..Default::default()
+        //     },
+        // );
         job.append(
             text,
             5.,

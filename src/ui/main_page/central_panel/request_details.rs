@@ -2,13 +2,16 @@ use std::sync::Arc;
 
 use egui::{
     text::LayoutJob, vec2, Align, Button, Color32, ComboBox, CornerRadius, FontFamily, FontId,
-    FontSelection, Frame, Label, Layout, Margin, ScrollArea, Separator, TextEdit, TextFormat,
-    TopBottomPanel, Ui,
+    FontSelection, Frame, Label, Layout, Margin, RichText, ScrollArea, Sense, Separator, TextEdit,
+    TextFormat, TopBottomPanel, Ui, WidgetText,
 };
 
 use crate::{
     settings::{Method, Protocol},
-    states::{main_page::Header, States},
+    states::{
+        main_page::{Entity, Header},
+        States,
+    },
     ui::icons::Icon,
 };
 
@@ -25,7 +28,7 @@ impl RequestDetailsPanel {
             states.main_page.selected_request_salt()
         ))
         .resizable(true)
-        .height_range(200.0..=400.)
+        .height_range(250.0..=400.)
         .frame(
             Frame::new()
                 .fill(states.style.color_main())
@@ -44,14 +47,157 @@ impl RequestDetailsPanel {
                         ..Default::default()
                     },
                 );
-                ui.add(Label::new(header_text).selectable(false));
+                ui.horizontal(|ui| {
+                    ui.add(Label::new(header_text).selectable(false));
 
+                    ui.add_space(ui.available_width() - 135.);
+
+                    ui.group(|ui| {
+                        ui.style_mut().spacing.button_padding = vec2(10., 10.);
+                        let entity_is_changed = states.main_page.entity_is_changed();
+                        if ui
+                            .add(
+                                Button::new(WidgetText::RichText(Arc::new(
+                                    RichText::new("cancel")
+                                        .color(if entity_is_changed {
+                                            Color32::WHITE
+                                        } else {
+                                            states.style.color_main()
+                                        })
+                                        .size(13.)
+                                        .monospace(),
+                                )))
+                                .sense(if entity_is_changed {
+                                    Sense::click()
+                                } else {
+                                    Sense::empty()
+                                })
+                                .fill(if entity_is_changed {
+                                    states.style.color_danger()
+                                } else {
+                                    states.style.color_secondary()
+                                }),
+                            )
+                            .clicked()
+                        {
+                            states.main_page.cancel_changes_of_selected_entity();
+                        };
+                        if ui
+                            .add(
+                                Button::new(WidgetText::RichText(Arc::new(
+                                    RichText::new("save")
+                                        .color(if entity_is_changed {
+                                            Color32::WHITE
+                                        } else {
+                                            states.style.color_main()
+                                        })
+                                        .monospace()
+                                        .size(13.),
+                                )))
+                                .sense(if entity_is_changed {
+                                    Sense::click()
+                                } else {
+                                    Sense::empty()
+                                })
+                                .fill(if entity_is_changed {
+                                    states.style.color_success()
+                                } else {
+                                    states.style.color_secondary()
+                                }),
+                            )
+                            .clicked()
+                        {
+                            states.save_selected(None);
+                        };
+                    });
+                });
+
+                self.update_path(ui, states);
                 self.update_url(ui, states);
                 self.update_headers(ui, states);
             })
         });
     }
 
+    /// Draw path line
+    fn update_path(&self, ui: &mut Ui, states: &mut States) {
+        ui.with_layout(Layout::left_to_right(Align::LEFT), |ui| {
+            let selected_collection_idx = states.main_page.selected_entity.collection_idx;
+
+            ui.style_mut().spacing.item_spacing = vec2(3., 1.);
+            // match selected_collection {
+            //     Some(val) => {
+            //         if let Entity::COLLECTION(selected_collection) = &states.main_page.entities[val]
+            //         {
+            //             ui.label(&selected_collection.draft.name);
+            //         }
+            //         return;
+            //     }
+            //     None => {}
+            // }
+
+            let current_collection_name = match states.main_page.selected_collection() {
+                Some(c) => c.draft.name.clone(),
+                None => "[root] /".into(),
+            };
+
+            ui.menu_button(
+                RichText::new(current_collection_name)
+                    .size(15.)
+                    .color(states.style.color_secondary())
+                    .monospace(),
+                |ui| {
+                    ui.style_mut().spacing.button_padding = vec2(10., 5.);
+                    if selected_collection_idx.is_some() {
+                        if ui.button("[root] /").clicked() {
+                            states.main_page.request_move_target.add(None);
+                        }
+                    }
+
+                    for i in 0..states.main_page.entities.len() {
+                        // skip collection currently owning this request
+                        if selected_collection_idx.is_some()
+                            && selected_collection_idx.unwrap() == i
+                        {
+                            continue;
+                        };
+                        if let Entity::COLLECTION(collection) = &states.main_page.entities[i] {
+                            if ui.button(collection.draft.name.clone()).clicked() {
+                                // Planning move on after loop. We cant mutate this vec during loop itself
+                                states.main_page.request_move_target.add(Some(i));
+                            }
+                        };
+                    }
+                },
+            );
+
+            let request = states.main_page.selected_request_mut();
+
+            if request.is_none() {
+                return;
+            };
+
+            let request = request.unwrap();
+            if ui
+                .add(
+                    TextEdit::singleline(&mut request.draft.name)
+                        .desired_width(ui.available_width())
+                        .font(FontSelection::FontId(FontId::new(
+                            15.,
+                            FontFamily::Monospace,
+                        )))
+                        .text_color(states.style.color_lighter())
+                        .background_color(states.style.color_main())
+                        .desired_width(ui.available_width()),
+                )
+                .changed()
+            {
+                request.is_changed = true;
+            }
+        });
+    }
+
+    /// Draw headers Table
     fn update_headers(&self, ui: &mut Ui, states: &mut States) {
         let request = states.main_page.selected_request_mut();
 
@@ -132,6 +278,7 @@ impl RequestDetailsPanel {
         });
     }
 
+    /// Draw URL group
     fn update_url(&self, ui: &mut Ui, states: &mut States) {
         ui.with_layout(Layout::top_down_justified(Align::LEFT), |ui| {
             let id_salt = states.main_page.selected_request_salt();
@@ -215,7 +362,7 @@ impl RequestDetailsPanel {
 
                     let request_url_resp = ui.add(
                         TextEdit::singleline(&mut request.draft.uri)
-                            .desired_width(ui.available_width() - 35.)
+                            .desired_width(ui.available_width() - 45.)
                             .text_color(states.style.color_main())
                             .background_color(states.style.color_lighter())
                             .font(FontSelection::FontId(FontId {

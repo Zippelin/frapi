@@ -176,9 +176,23 @@ impl Settings {
         };
         Ok(())
     }
+
+    /// From States -> Settings.
+    /// All changes took from "original" fields.
+    /// Used as part of Save On New Entity
+    pub fn from_original(value: &States) -> Self {
+        Self {
+            ui: UISettings::from(&value.style),
+            main_page: MainPageSettings::from_original(&value.main_page),
+            options: Options::from(&value.options),
+        }
+    }
 }
 
 impl From<&States> for Settings {
+    /// From States -> Settings.
+    /// All changes took from "draft" fields.
+    /// Used as part of Save All
     fn from(value: &States) -> Self {
         Self {
             ui: UISettings::from(&value.style),
@@ -256,6 +270,13 @@ impl MainPageSettings {
     pub fn default() -> Self {
         Self { entities: vec![] }
     }
+    pub fn from_original(value: &MainPage) -> Self {
+        let mut entities = vec![];
+        for state_entity in &value.entities {
+            entities.push(Entity::from_original(state_entity));
+        }
+        Self { entities }
+    }
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
@@ -271,6 +292,17 @@ impl From<&StateEntity> for Entity {
                 Self::COLLECTION(CollectionSettings::from(collection))
             }
             StateEntity::REQUEST(request) => Self::REQUEST(RequestSettings::from(request)),
+        }
+    }
+}
+
+impl Entity {
+    pub fn from_original(value: &StateEntity) -> Self {
+        match value {
+            StateEntity::COLLECTION(collection) => {
+                Self::COLLECTION(CollectionSettings::from_original(collection))
+            }
+            StateEntity::REQUEST(request) => Self::REQUEST(RequestSettings::from_original(request)),
         }
     }
 }
@@ -294,6 +326,22 @@ impl From<&StateCollection> for CollectionSettings {
             id: value.id.clone(),
             name: value.draft.name.clone(),
             description: value.draft.description.clone(),
+            requests,
+        }
+    }
+}
+
+impl CollectionSettings {
+    pub fn from_original(value: &StateCollection) -> Self {
+        let requests = value
+            .requests
+            .iter()
+            .map(|val| RequestSettings::from(val))
+            .collect();
+        Self {
+            id: value.id.clone(),
+            name: value.original.name.clone(),
+            description: value.original.description.clone(),
             requests,
         }
     }
@@ -326,6 +374,26 @@ impl From<&StateRequest> for RequestSettings {
             uri: value.draft.uri.clone(),
             headers,
             body: value.draft.body.clone(),
+        }
+    }
+}
+
+impl RequestSettings {
+    fn from_original(value: &StateRequest) -> Self {
+        let headers = value
+            .original
+            .headers
+            .iter()
+            .map(|val| Header::from(val))
+            .collect();
+        Self {
+            id: value.id.clone(),
+            name: value.original.name.clone(),
+            protocol: value.original.protocol.clone(),
+            method: value.original.method.clone(),
+            uri: value.original.uri.clone(),
+            headers,
+            body: value.original.body.clone(),
         }
     }
 }

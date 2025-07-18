@@ -14,6 +14,7 @@ use crate::{
 
 pub mod main_page;
 
+#[derive(Clone, Debug)]
 pub struct States {
     pub current_page: Page,
     pub main_page: MainPage,
@@ -51,6 +52,7 @@ impl States {
         self.events.lock().unwrap().clear_events();
     }
 
+    /// Process Entities after save - removing chage status
     pub fn on_save_complete(&mut self) {
         for i in 0..self.main_page.entities.len() {
             match &mut self.main_page.entities[i] {
@@ -60,7 +62,7 @@ impl States {
         }
     }
 
-    /// Load settigns from path.
+    /// Load settings from path.
     /// Replace partialy currrent states
     pub fn load(&mut self, file_path: Option<PathBuf>) {
         let settings = match Settings::dyn_load(file_path) {
@@ -78,13 +80,87 @@ impl States {
         self.main_page = new_states.main_page;
     }
 
+    /// Saving all data and mark changed entities to unchanged
     pub fn save(&mut self, save_to_path: Option<PathBuf>) {
         match Settings::from(&*self).save(save_to_path) {
             Ok(_) => {
-                self.event_info(&"Settings save complete successful".into());
+                self.event_info(&"Settings [all] save complete successful".into());
                 self.on_save_complete();
             }
             Err(err) => self.event_error(&err),
+        };
+    }
+
+    /// Update all necerary plannes changes for states data for next frame
+    pub fn update(&mut self) {
+        let move_done = self.main_page.update_request_move();
+        if move_done {
+            self.save_original(None);
+        }
+
+        let deletion_done = self.main_page.delete_marked_entity();
+        if deletion_done {
+            self.save_original(None);
+        }
+    }
+
+    /// Saving data with original states. Mostly need for savings on moved entity
+    pub fn save_original(&mut self, save_to_path: Option<PathBuf>) {
+        match Settings::from_original(&*self).save(save_to_path) {
+            Ok(_) => {
+                self.event_info(&"Settings [original] save complete successful".into());
+                self.on_save_complete();
+            }
+            Err(err) => self.event_error(&err),
+        };
+    }
+
+    /// Saving only selected Entity
+    pub fn save_selected(&mut self, save_to_path: Option<PathBuf>) {
+        let request = self.main_page.selected_request_mut();
+
+        if request.is_some() {
+            let request = request.unwrap();
+
+            let backup_original_data = request.original.clone();
+            request.on_save();
+
+            let save_result = Settings::from_original(&*self).save(save_to_path);
+
+            if save_result.is_err() {
+                let err = save_result.unwrap_err();
+                let request = self.main_page.selected_request_mut().unwrap();
+                request.original.copy_from_other(&backup_original_data);
+                request.is_changed = true;
+                self.event_error(&format!("Could not save selected request. Error: {err}"))
+            } else {
+                self.event_info(&"Settings [selected] save complete successful".into());
+            }
+            return;
+        };
+
+        let collection = self.main_page.selected_collection_mut();
+
+        if collection.is_some() {
+            let collection = collection.unwrap();
+
+            let backup_original_data = collection.original.clone();
+            collection.on_save();
+
+            let save_result = Settings::from_original(&*self).save(save_to_path);
+
+            if save_result.is_err() {
+                let err = save_result.unwrap_err();
+                let collection = self.main_page.selected_collection_mut().unwrap();
+                collection.original.copy_from_other(&backup_original_data);
+                collection.is_changed = true;
+                self.event_error(&format!("Could not save selected collection. Error: {err}"))
+            } else {
+                self.event_info(
+                    &"Settings save complete successful for selected collection".into(),
+                );
+            }
+            return;
         };
     }
 }
@@ -161,10 +237,12 @@ impl Style {
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum Page {
     MAIN,
 }
 
+#[derive(Clone, Debug)]
 pub struct Options {}
 
 impl From<&SettingsOptions> for Options {

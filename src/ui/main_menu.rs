@@ -1,9 +1,8 @@
 use std::{path::PathBuf, process::exit, sync::Arc};
 
 use egui::{
-    menu::{self},
-    vec2, Align, Context, CornerRadius, Frame, Label, Layout, Margin, MenuBar, Pos2, Rect,
-    RichText, TopBottomPanel, Visuals, WidgetText, Window,
+    vec2, Context, CornerRadius, Frame, Label, Margin, MenuBar, Pos2, RichText, TopBottomPanel,
+    Visuals, WidgetText, Window,
 };
 use rfd::FileDialog;
 
@@ -46,8 +45,15 @@ impl MainMenu {
 
                     ui.menu_button("File", |ui| {
                         ui.style_mut().spacing.button_padding = vec2(10., 10.);
-                        if ui.button("Save                          Ctrl+S").clicked() {
+                        if ui
+                            .button("Save All                      Ctrl+Shift+S")
+                            .clicked()
+                        {
                             states.save(None);
+                        };
+                        ui.style_mut().spacing.button_padding = vec2(10., 10.);
+                        if ui.button("Save Selected           Ctrl+S").clicked() {
+                            states.save_selected(None);
                         };
 
                         ui.menu_button("Export / Import", |ui| {
@@ -143,7 +149,7 @@ impl MainMenu {
                         );
 
                         ui.add_space(10.);
-                        ui.add(Label::new("Ver: 0.1.0").selectable(false));
+                        ui.add(Label::new("Ver: 0.1.0 beta").selectable(false));
                         ui.add_space(10.);
                         ui.add(
                             Label::new(

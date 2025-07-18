@@ -1,13 +1,9 @@
 /// Stated of Main page of application
 ///
-use std::{
-    hash::{DefaultHasher, Hash, Hasher},
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Local};
 
-use eframe::glow::NONE;
 use serde_json::Value;
 use tokio_tungstenite::tungstenite::Utf8Bytes;
 
@@ -39,6 +35,22 @@ impl From<&SettingsEntity> for Entity {
             SettingsEntity::REQUEST(request_settings) => {
                 Self::REQUEST(Request::from(request_settings))
             }
+        }
+    }
+}
+
+impl Entity {
+    pub fn is_collection(&self) -> bool {
+        match &self {
+            Entity::COLLECTION(_) => true,
+            Entity::REQUEST(_) => false,
+        }
+    }
+
+    pub fn is_request(&self) -> bool {
+        match &self {
+            Entity::COLLECTION(_) => false,
+            Entity::REQUEST(_) => true,
         }
     }
 }
@@ -86,6 +98,19 @@ impl From<&RequestSettings> for Request {
 }
 
 impl Request {
+    pub fn default() -> Self {
+        let responses = Arc::new(Mutex::new(vec![]));
+        let executor = Executor::new(responses.clone());
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            is_changed: false,
+            original: RequestData::default(),
+            draft: RequestData::default(),
+            responses,
+            new_header: Header::default(),
+            executor,
+        }
+    }
     /// Fire Executor to make reqeusts
     pub fn go(&mut self, events: Arc<Mutex<Events>>) {
         self.executor.execute(&self.draft, events);
@@ -151,6 +176,11 @@ impl Request {
         }
         false
     }
+
+    pub fn cancel_changes(&mut self) {
+        self.draft.copy_from_other(&self.original);
+        self.is_changed = false
+    }
 }
 
 /// Collection Entity representation
@@ -192,6 +222,16 @@ impl From<&CollectionSettings> for Collection {
 }
 
 impl Collection {
+    pub fn default() -> Self {
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            is_changed: false,
+            original: CollectionData::default(),
+            draft: CollectionData::default(),
+            requests: vec![],
+            is_folded: true,
+        }
+    }
     /// Drop change mark and transfer Draft to Original Data.
     /// Will check if changes accured and save realy need to be.
     /// For Save purpose.
@@ -219,6 +259,11 @@ impl Collection {
         }
         false
     }
+
+    pub fn cancel_changes(&mut self) {
+        self.draft.copy_from_other(&self.original);
+        self.is_changed = false
+    }
 }
 
 /// Header of Request State
@@ -226,6 +271,15 @@ impl Collection {
 pub struct Header {
     pub key: String,
     pub value: String,
+}
+
+impl Header {
+    pub fn default() -> Self {
+        Self {
+            key: "".into(),
+            value: "".into(),
+        }
+    }
 }
 
 /// Request data representation
@@ -274,6 +328,16 @@ impl From<&RequestSettings> for RequestData {
 }
 
 impl RequestData {
+    pub fn default() -> Self {
+        Self {
+            name: "New Request".into(),
+            protocol: Protocol::HTTP,
+            method: Method::GET,
+            uri: "".into(),
+            headers: vec![],
+            body: "".into(),
+        }
+    }
     /// Copy from other Self.
     /// Usualy used on Save.
     pub fn copy_from_other(&mut self, other_request: &Self) {
@@ -312,6 +376,12 @@ impl From<&CollectionSettings> for CollectionData {
 }
 
 impl CollectionData {
+    pub fn default() -> Self {
+        Self {
+            name: "New Collection".into(),
+            description: "".into(),
+        }
+    }
     /// Copy from other Self.
     /// Usualy used on Save.
     pub fn copy_from_other(&mut self, other_collection: &Self) {
@@ -357,6 +427,7 @@ impl SelectedEntity {
     }
 
     /// Uselect collection
+    #[allow(dead_code)]
     fn unselect_collection(&mut self) {
         self.collection_idx = None;
     }
@@ -404,6 +475,9 @@ impl SelectedEntity {
                 true
             }
             None => {
+                if self.collection_idx.is_some() {
+                    return false;
+                }
                 if let Some(r_idx) = self.request_idx {
                     r_idx == request_idx
                 } else {
@@ -761,13 +835,46 @@ impl FilteredEntities {
     }
 }
 
+/// Request move target - used when need to transfer request between collections
+#[derive(Debug, Clone)]
+pub struct RequestMoveTarget {
+    target: Vec<Option<usize>>,
+}
+
+impl RequestMoveTarget {
+    pub fn new() -> Self {
+        Self { target: vec![] }
+    }
+
+    pub fn move_planned(&self) -> bool {
+        self.target.len() > 0
+    }
+
+    pub fn take(&mut self) -> Option<usize> {
+        self.target.remove(0)
+    }
+
+    pub fn add(&mut self, target: Option<usize>) {
+        self.target.push(target);
+    }
+}
+
 /// Main Page States
 #[derive(Debug, Clone)]
 pub struct MainPage {
+    /// List of all entities - collection adn reqeusts
     pub entities: Vec<Entity>,
+    /// List of indexes for entities with contain filter string
     pub filtered_entities: FilteredEntities,
+    /// Currently selected (clicked) entity
     pub selected_entity: SelectedEntity,
+    /// Entity marked for deletion on next frame
+    pub deletion_entity: SelectedEntity,
+    /// Filter string
     pub filter_text: String,
+    /// Description where to move entity
+    pub request_move_target: RequestMoveTarget,
+    /// Styles and colors for UI theme
     pub style: Style,
 }
 
@@ -784,6 +891,8 @@ impl From<&Settings> for MainPage {
             selected_entity: SelectedEntity::new(),
             style: Style::from(&value.ui),
             filter_text: "".into(),
+            request_move_target: RequestMoveTarget::new(),
+            deletion_entity: SelectedEntity::new(),
         }
     }
 }
@@ -821,6 +930,17 @@ impl MainPage {
         }
     }
 
+    /// Get currently selected collection
+    pub fn selected_collection(&self) -> Option<&Collection> {
+        if self.selected_entity.collection_idx.is_none() {
+            return None;
+        };
+        match &self.entities[self.selected_entity.collection_idx.unwrap()] {
+            Entity::COLLECTION(collection) => Some(&collection),
+            Entity::REQUEST(_) => None,
+        }
+    }
+
     /// Get currently selected request as mutable
     pub fn selected_request_mut(&mut self) -> Option<&mut Request> {
         if self.selected_entity.request_idx.is_none() {
@@ -846,6 +966,31 @@ impl MainPage {
         }
     }
 
+    /// Get currently selected request
+    pub fn selected_request(&self) -> Option<&Request> {
+        if self.selected_entity.request_idx.is_none() {
+            return None;
+        };
+
+        let request_idx = self.selected_entity.request_idx.unwrap();
+        match self.selected_entity.collection_idx {
+            Some(val) => {
+                if let Entity::COLLECTION(collection) = &self.entities[val] {
+                    return Some(&collection.requests[request_idx]);
+                } else {
+                    return None;
+                }
+            }
+            None => {
+                if let Entity::REQUEST(request) = &self.entities[request_idx] {
+                    return Some(&request);
+                } else {
+                    return None;
+                }
+            }
+        }
+    }
+
     /// Get currently selected request as consistent id salt for UI salt
     pub fn selected_request_salt(&self) -> String {
         let collection_string = if self.selected_entity.collection_idx.is_none() {
@@ -860,40 +1005,6 @@ impl MainPage {
             self.selected_entity.request_idx.unwrap().to_string()
         };
         format!("{collection_string}-{request_string}")
-    }
-
-    /// Change currently selected request
-    pub fn request_mut(
-        &mut self,
-        collection_idx: Option<usize>,
-        request_idx: usize,
-    ) -> &mut Request {
-        match collection_idx {
-            Some(val) => {
-                if let Entity::COLLECTION(collection) = &mut self.entities[val] {
-                    return &mut collection.requests[request_idx];
-                } else {
-                    let col_idx_str = if collection_idx.is_none() {
-                        "None".into()
-                    } else {
-                        format!("{}", collection_idx.unwrap())
-                    };
-                    panic!("Could not find Request item by index: {col_idx_str}-{request_idx}")
-                }
-            }
-            None => {
-                if let Entity::REQUEST(request) = &mut self.entities[request_idx] {
-                    return request;
-                } else {
-                    let col_idx_str = if collection_idx.is_none() {
-                        "None".into()
-                    } else {
-                        format!("{}", collection_idx.unwrap())
-                    };
-                    panic!("Could not find Request item by index: {col_idx_str}-{request_idx}")
-                }
-            }
-        }
     }
 
     /// Set currently selected request or collection as changed
@@ -977,20 +1088,316 @@ impl MainPage {
                 }
             }
         }
-        println!("{:?}", filtered_entities);
         self.filtered_entities = filtered_entities;
     }
 
+    /// Drop filter adn regenerate idexes to display
     pub fn drop_filter(&mut self) {
         self.filter_text = "".into();
         self.apply_filter();
     }
-}
 
-/// Получаем хеш из строки.
-/// Используется для генерации уникального состояния свернутости ColapsingHeaders
-pub fn get_map_hash_from_str(text: String) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    text.hash(&mut hasher);
-    hasher.finish()
+    /// Creating new collection relative to currently selected.
+    /// New Collection will be next after selected collection, or in the end if request selected
+    pub fn new_collection(&mut self) -> usize {
+        let selected_collection_idx = self.selected_entity.collection_idx;
+        match selected_collection_idx {
+            Some(idx) => {
+                if self.selected_entity.request_idx.is_some() {
+                    self.entities
+                        .push(Entity::COLLECTION(Collection::default()));
+                    return self.entities.len() - 1;
+                } else {
+                    self.entities
+                        .insert(idx + 1, Entity::COLLECTION(Collection::default()));
+                    return idx + 1;
+                }
+            }
+            None => {
+                self.entities
+                    .push(Entity::COLLECTION(Collection::default()));
+                return self.entities.len() - 1;
+            }
+        };
+    }
+
+    /// Creating new request relative to currently selected.
+    /// New request will be next after selected request, or in selected collection
+    pub fn new_request(&mut self) -> (Option<usize>, usize) {
+        let selected_collection_idx = self.selected_entity.collection_idx;
+        let selected_request_idx = self.selected_entity.request_idx;
+
+        if let Some(selected_collection_idx) = selected_collection_idx {
+            // If selected entity is request in collection
+            if let Some(selected_request_idx) = selected_request_idx {
+                match &mut self.entities[selected_collection_idx] {
+                    // Selected request in collection
+                    Entity::COLLECTION(collection) => {
+                        collection
+                            .requests
+                            .insert(selected_request_idx + 1, Request::default());
+                        return (Some(selected_collection_idx), selected_request_idx + 1);
+                    }
+                    // This could be logical error, but still adding new request next to collection entity
+                    Entity::REQUEST(_) => {
+                        self.entities.insert(
+                            selected_collection_idx + 1,
+                            Entity::REQUEST(Request::default()),
+                        );
+                        return (None, selected_collection_idx + 1);
+                    }
+                }
+            // If selected entity is collection (request not selected)
+            // This mean that root element - collection selected
+            } else {
+                match &mut self.entities[selected_collection_idx] {
+                    Entity::COLLECTION(collection) => {
+                        collection.requests.push(Request::default());
+                        return (Some(selected_collection_idx), collection.requests.len() - 1);
+                    }
+                    // This could be logical error, but still adding new request next to collection entity
+                    Entity::REQUEST(_) => {
+                        self.entities.insert(
+                            selected_collection_idx + 1,
+                            Entity::REQUEST(Request::default()),
+                        );
+                        return (None, selected_collection_idx + 1);
+                    }
+                }
+            }
+        };
+
+        // If selected only request without collection - means request on root level
+        if let Some(selected_request_idx) = selected_request_idx {
+            self.entities.insert(
+                selected_request_idx + 1,
+                Entity::REQUEST(Request::default()),
+            );
+            return (None, selected_request_idx + 1);
+        };
+
+        // If nothing is selected, creating as last in root
+        self.entities.push(Entity::REQUEST(Request::default()));
+        return (None, self.entities.len() - 1);
+    }
+
+    /// Try to get collection by index and set fold state
+    pub fn set_collection_fold_state(&mut self, index: usize, state: bool) {
+        match &mut self.entities[index] {
+            Entity::COLLECTION(collection) => collection.is_folded = state,
+            Entity::REQUEST(_) => {}
+        }
+    }
+
+    /// Get state of changes in selected entity
+    pub fn entity_is_changed(&self) -> bool {
+        if self.is_collection_selected() {
+            return self.selected_collection().unwrap().is_changed;
+        };
+        if self.is_request_selected() {
+            return self.selected_request().unwrap().is_changed;
+        };
+        false
+    }
+
+    /// Cancel changes of selected entity
+    pub fn cancel_changes_of_selected_entity(&mut self) {
+        if self.is_collection_selected() {
+            self.selected_collection_mut().unwrap().cancel_changes();
+        };
+        if self.is_request_selected() {
+            self.selected_request_mut().unwrap().cancel_changes();
+        };
+    }
+    /// Try to move request to target collection.
+    /// Checking if there is planned move.
+    /// Return [true] if move was done
+    pub fn update_request_move(&mut self) -> bool {
+        if self.request_move_target.move_planned() {
+            let requested_move = self.request_move_target.take();
+            self.move_selected_request_to_collection(requested_move);
+            return true;
+        };
+        false
+    }
+
+    /// Move reqeust to target collection.
+    /// None collection index = root level
+    pub fn move_selected_request_to_collection(&mut self, target_collection_idx: Option<usize>) {
+        if !self.is_request_selected() {
+            return;
+        }
+
+        // Check if was in root and reqeust in root
+        if target_collection_idx.is_none() && self.selected_entity.collection_idx.is_none() {
+            return;
+        }
+
+        // Safe check done above
+        let request_idx = self.selected_entity.request_idx.unwrap();
+
+        // Check requested and old collection - same
+        if let Some(old_collection_idx) = self.selected_entity.collection_idx {
+            if let Some(new_collection_idx) = target_collection_idx {
+                if new_collection_idx == old_collection_idx {
+                    return;
+                }
+            }
+        }
+        // Before changing list of entities we must clear current selectio
+        // self.selected_entity.unselect_request();
+
+        let request = if let Some(collection) = self.selected_collection_mut() {
+            // if current selected request in collection
+            collection.requests.remove(request_idx)
+        } else {
+            // if request in root level
+            let selected_request = self.entities.remove(request_idx);
+            if let Entity::REQUEST(sr) = selected_request {
+                sr
+            // Cant happen, since we checked before that we not in collection, but on root level.
+            } else {
+                return;
+            }
+        };
+
+        if let Some(mut target_col_idx) = target_collection_idx {
+            // When removed request on prev step vec indexes changed and shift happened
+            // If old position was on root level and target AFTER it, we need consider vec changes of indexes
+            if self.selected_entity.collection_idx.is_none()
+                && target_col_idx > self.selected_entity.request_idx.unwrap()
+            {
+                target_col_idx -= 1;
+            }
+
+            match &mut self.entities[target_col_idx] {
+                Entity::COLLECTION(collection) => {
+                    // if move target - other collection
+                    collection.requests.push(request);
+                    self.selected_entity
+                        .select_request(Some(target_col_idx), collection.requests.len() - 1);
+                    collection.is_folded = false;
+                }
+                // Cant happen in usual way. But already removed reqeust before,
+                // so maybe here could be troubles if UI lacking restrictions
+                Entity::REQUEST(_) => {}
+            }
+        } else {
+            self.entities.push(Entity::REQUEST(request));
+            self.selected_entity
+                .select_request(None, self.entities.len() - 1)
+        }
+
+        self.drop_filter();
+    }
+
+    /// Checking if root is collection
+    pub fn root_entity_is_collection(&self, idx: usize) -> bool {
+        if idx >= self.entities.len() {
+            return false;
+        };
+        self.entities[idx].is_collection()
+    }
+
+    /// Checking if root is request
+    pub fn root_entity_is_request(&self, idx: usize) -> bool {
+        if idx >= self.entities.len() {
+            return false;
+        };
+        self.entities[idx].is_request()
+    }
+
+    pub fn get_collection_mut(&mut self, idx: usize) -> Option<&mut Collection> {
+        let entity = match self.entities.get_mut(idx) {
+            Some(val) => val,
+            None => return None,
+        };
+
+        match entity {
+            Entity::COLLECTION(collection) => Some(collection),
+            Entity::REQUEST(_) => None,
+        }
+    }
+
+    pub fn get_reqeust_mut(&mut self, idx: usize) -> Option<&mut Request> {
+        let entity = match self.entities.get_mut(idx) {
+            Some(val) => val,
+            None => return None,
+        };
+
+        match entity {
+            Entity::COLLECTION(_) => None,
+            Entity::REQUEST(request) => Some(request),
+        }
+    }
+
+    /// Delete requested entity
+    /// Return mark if changes made or not
+    pub fn delete_marked_entity(&mut self) -> bool {
+        if !self.deletion_entity.is_selected() {
+            return false;
+        }
+
+        println!("start deletion");
+        match self.deletion_entity.collection_idx {
+            // If collection exist
+            Some(collection_idx) => match self.deletion_entity.request_idx {
+                // If requeust in collection
+                Some(request_idx) => match &mut self.entities[collection_idx] {
+                    // if buy collection_idx exist collection - success
+                    Entity::COLLECTION(collection) => {
+                        // if we select currently deleting entity - need to uselect
+                        if self
+                            .selected_entity
+                            .request_is_selected(Some(collection_idx), request_idx)
+                        {
+                            self.selected_entity.unselect_request();
+                        }
+                        collection.requests.remove(request_idx);
+                        self.drop_filter();
+                        self.deletion_entity.unselect_request();
+                        return true;
+                    }
+                    Entity::REQUEST(_) => return false,
+                },
+                // If only collection and no reqeust
+                None => match &mut self.entities[collection_idx] {
+                    // if by index of collection_idx collection exist - success
+                    Entity::COLLECTION(_) => {
+                        // if we select currently deleting entity - need to uselect
+                        if self.selected_entity.collection_is_selected(collection_idx) {
+                            self.selected_entity.unselect_collection();
+                        }
+                        self.entities.remove(collection_idx);
+                        self.drop_filter();
+                        self.deletion_entity.unselect_collection();
+                        return true;
+                    }
+                    // if by indx of collection_idx reqeust exist - error
+                    Entity::REQUEST(_) => return false,
+                },
+            },
+            // If Collection not exist - prob root level
+            None => match self.deletion_entity.request_idx {
+                // If Request on root level
+                Some(request_idx) => match self.entities[request_idx] {
+                    // if on index not request, but collection - error
+                    Entity::COLLECTION(_) => return false,
+                    // if on index request - success
+                    Entity::REQUEST(_) => {
+                        // if we select currently deleting entity - need to uselect
+                        if self.selected_entity.request_is_selected(None, request_idx) {
+                            self.selected_entity.unselect_request();
+                        }
+                        self.entities.remove(request_idx);
+                        self.drop_filter();
+                        self.deletion_entity.unselect_request();
+                        return true;
+                    }
+                },
+                // If no collection and no request - error
+                None => return false,
+            },
+        };
+    }
 }
