@@ -3,10 +3,12 @@ use egui::{Context, Key};
 
 use crate::{
     states::States,
-    ui::{main_menu::MainMenu, main_page::MainPage},
+    ui::{bottom::BottomPanel, main_menu::MainMenu, main_page::MainPage},
 };
 
+mod bottom;
 pub mod colors;
+pub mod fonts;
 mod icons;
 mod main_menu;
 mod main_page;
@@ -15,6 +17,7 @@ pub struct UI {
     states: States,
     main_page: MainPage,
     main_menu: MainMenu,
+    bottom: BottomPanel,
 }
 
 impl UI {
@@ -23,12 +26,14 @@ impl UI {
             states,
             main_page: MainPage::new(),
             main_menu: MainMenu::new(),
+            bottom: BottomPanel::new(),
         }
     }
 
     pub fn update(&mut self, ctx: &Context, frame: &mut Frame) {
         let _ = frame;
         self.main_menu.update(ctx, &mut self.states);
+        self.bottom.update(ctx, &mut self.states);
         match self.states.current_page {
             crate::states::Page::MAIN => self.main_page.update(ctx, &mut self.states),
         }

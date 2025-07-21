@@ -218,7 +218,7 @@ impl Executor {
     }
 
     /// Terminate currently pending requests, if any
-    pub fn terminate(&mut self) {
+    pub async fn terminate(&mut self) {
         if self.channel_sender.is_none() {
             *self.state.lock().unwrap() = State::FREE;
             return;
@@ -228,8 +228,9 @@ impl Executor {
             .channel_sender
             .as_mut()
             .unwrap()
-            .send(Message::terminate());
-        *self.state.lock().unwrap() = State::FREE;
+            .send(Message::terminate())
+            .await;
+        // *self.state.lock().unwrap() = State::FREE;
     }
 
     /// Spawn separate thread for http reqeusts
@@ -258,6 +259,9 @@ impl Executor {
             Command::EXECUTE(command_execute) => {
                 let request_future = async {
                     let uri = format!("{}://{}", command_execute.protocol, command_execute.uri);
+
+                    // sleep(Duration::from_secs(50)).await;
+
                     let result = Client::new()
                         .request(command_execute.method.into(), uri.clone())
                         .send()
@@ -303,12 +307,11 @@ impl Executor {
                 };
 
                 let terminate_future = async {
-                    loop {
-                        // любая команда сюда приводит к ответе текущего выполнения
-                        command_channel.recv().await;
-                    }
+                    // любая команда сюда приводит к ответе текущего выполнения
+                    command_channel.recv().await;
                 };
 
+                println!("select go!");
                 select! {
                     _ = request_future => {
                         *executor_state.lock().unwrap() = State::FREE;

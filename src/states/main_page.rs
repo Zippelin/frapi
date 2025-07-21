@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Local};
 
+use futures::executor::block_on;
 use serde_json::Value;
 use tokio_tungstenite::tungstenite::Utf8Bytes;
 
@@ -55,6 +56,13 @@ impl Entity {
     }
 }
 
+/// Reqeust details currently shown on UI
+#[derive(Debug, Clone, PartialEq)]
+pub enum RequestDetails {
+    Header,
+    Body,
+}
+
 /// Request Entity state represenation
 #[derive(Debug, Clone)]
 pub struct Request {
@@ -72,6 +80,8 @@ pub struct Request {
     pub new_header: Header,
     /// request executor engine
     executor: Executor,
+    /// details currently on screen
+    pub visible_details: RequestDetails,
 }
 
 /// From Settings -> State
@@ -93,6 +103,7 @@ impl From<&RequestSettings> for Request {
                 key: "".into(),
                 value: "".into(),
             },
+            visible_details: RequestDetails::Header,
         }
     }
 }
@@ -109,6 +120,7 @@ impl Request {
             responses,
             new_header: Header::default(),
             executor,
+            visible_details: RequestDetails::Header,
         }
     }
     /// Fire Executor to make reqeusts
@@ -117,8 +129,10 @@ impl Request {
     }
 
     /// Stop Executor, also drop execution in progress
+    /// This function block main thread to wait termination ends.
+    /// Since termination very simple send to channel method, real block wont happen
     pub fn termiate(&mut self) {
-        self.executor.terminate();
+        block_on(self.executor.terminate());
     }
 
     /// Check if Executor is Free for job
@@ -180,6 +194,14 @@ impl Request {
     pub fn cancel_changes(&mut self) {
         self.draft.copy_from_other(&self.original);
         self.is_changed = false
+    }
+
+    pub fn details_to_header(&mut self) {
+        self.visible_details = RequestDetails::Header
+    }
+
+    pub fn details_to_body(&mut self) {
+        self.visible_details = RequestDetails::Body
     }
 }
 
@@ -417,13 +439,14 @@ impl SelectedEntity {
     /// Selecting passes collection
     /// Automaticly uselect request
     pub fn select_collection(&mut self, idx: usize) {
-        self.collection_idx = Some(idx);
         self.unselect_request();
+        self.collection_idx = Some(idx);
     }
 
     /// Uselect request
     fn unselect_request(&mut self) {
         self.request_idx = None;
+        self.collection_idx = None;
     }
 
     /// Uselect collection
@@ -869,6 +892,7 @@ pub struct MainPage {
     /// Currently selected (clicked) entity
     pub selected_entity: SelectedEntity,
     /// Entity marked for deletion on next frame
+    /// To mark for deletion selet use `select_request` or `select_collection`
     pub deletion_entity: SelectedEntity,
     /// Filter string
     pub filter_text: String,
@@ -876,6 +900,8 @@ pub struct MainPage {
     pub request_move_target: RequestMoveTarget,
     /// Styles and colors for UI theme
     pub style: Style,
+    /// Visible or not right sided panel
+    pub right_panel_is_visible: bool,
 }
 
 /// From Settings -> State
@@ -893,6 +919,7 @@ impl From<&Settings> for MainPage {
             filter_text: "".into(),
             request_move_target: RequestMoveTarget::new(),
             deletion_entity: SelectedEntity::new(),
+            right_panel_is_visible: false,
         }
     }
 }
@@ -1091,7 +1118,7 @@ impl MainPage {
         self.filtered_entities = filtered_entities;
     }
 
-    /// Drop filter adn regenerate idexes to display
+    /// Drop filter and regenerate idexes to display
     pub fn drop_filter(&mut self) {
         self.filter_text = "".into();
         self.apply_filter();
@@ -1338,7 +1365,6 @@ impl MainPage {
             return false;
         }
 
-        println!("start deletion");
         match self.deletion_entity.collection_idx {
             // If collection exist
             Some(collection_idx) => match self.deletion_entity.request_idx {
@@ -1353,8 +1379,15 @@ impl MainPage {
                         {
                             self.selected_entity.unselect_request();
                         }
+                        println!("123");
                         collection.requests.remove(request_idx);
+                        println!("{:?}", collection);
                         self.drop_filter();
+
+                        for e in &self.entities {
+                            println!("{:?}\n", e);
+                        }
+                        println!("{:?}", self.filtered_entities);
                         self.deletion_entity.unselect_request();
                         return true;
                     }
@@ -1399,5 +1432,36 @@ impl MainPage {
                 None => return false,
             },
         };
+    }
+
+    /// Get len of selected inner items (For Collections - amount of reqeusts)
+    pub fn get_selected_items_count(&self) -> usize {
+        if !self.selected_entity.is_selected() {
+            return self.entities.len();
+        };
+
+        if self.selected_request().is_some() {
+            return 1;
+        };
+
+        if let Some(collection) = self.selected_collection() {
+            return collection.requests.len();
+        };
+
+        return self.entities.len();
+    }
+
+    /// Test state of selected reqquest executor
+    pub fn selected_request_executor_state(&self) -> String {
+        if let Some(request) = self.selected_request() {
+            let state = request.executor.state.lock();
+            let state = state.unwrap().clone();
+            match state {
+                State::FREE => return "FREE".into(),
+                State::BUSY => return "BUSY".into(),
+                State::CONNECTED => return "CONNECTED".into(),
+            }
+        }
+        return "FREE".into();
     }
 }

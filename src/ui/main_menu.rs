@@ -85,6 +85,11 @@ impl MainMenu {
                     ui.menu_button("Options", |ui| {
                         ui.style_mut().spacing.button_padding = vec2(10., 10.);
                         let _ = ui.button("Settings             ");
+
+                        if ui.button("Toggle Right panel             ").clicked() {
+                            states.main_page.right_panel_is_visible =
+                                !states.main_page.right_panel_is_visible;
+                        };
                     });
 
                     ui.menu_button("About", |ui| {

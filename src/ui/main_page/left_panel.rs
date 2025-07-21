@@ -2,14 +2,14 @@ use std::sync::Arc;
 
 use egui::{
     text::LayoutJob, vec2, Align, Button, Color32, Context, CornerRadius, FontFamily, FontId,
-    FontSelection, Frame, Key, Label, Layout, Margin, Response, RichText, ScrollArea,
-    SelectableLabel, Sense, SidePanel, Stroke, TextEdit, TextFormat, Ui, Widget, WidgetText,
+    FontSelection, Frame, Key, Label, Layout, Margin, Response, RichText, ScrollArea, SidePanel,
+    Stroke, TextEdit, TextFormat, TextWrapMode, Ui, WidgetText,
 };
 
 use crate::{
     settings::{Method, Protocol},
     states::{
-        main_page::{Collection, Entity, Request, SelectedEntity},
+        main_page::{Entity, SelectedEntity},
         States, Style,
     },
     ui::icons::Icon,
@@ -26,11 +26,12 @@ impl LeftPanel {
         // Заголовок с фильтром
         SidePanel::left("left")
             .default_width(200.)
-            .width_range(150.0..=300.)
+            .width_range(200.0..=300.)
             .frame(Frame::new().fill(states.style.color_main()))
             .resizable(true)
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
+                    // Group of Add new Entity buttons adn filter
                     ui.group(|ui| {
                         ui.style_mut().spacing.button_padding = vec2(10., 10.);
                         ui.menu_button("New", |ui| {
@@ -67,14 +68,14 @@ impl LeftPanel {
                         let filter_textedit =
                             TextEdit::singleline(&mut states.main_page.filter_text)
                                 .hint_text(WidgetText::RichText(Arc::new(
-                                    RichText::new("filter")
+                                    RichText::new("search")
                                         .color(states.style.color_secondary())
                                         .monospace()
                                         .size(15.),
                                 )))
                                 .text_color(states.style.color_main())
                                 .char_limit(50)
-                                .font(FontSelection::FontId(FontId::proportional(15.)))
+                                .font(FontSelection::FontId(states.style.fonts.header2()))
                                 .desired_width(ui.available_width() - 29.);
 
                         ui.style_mut().spacing.item_spacing = vec2(1., 0.);
@@ -132,7 +133,7 @@ impl VisualEntity {
 
     pub fn update(&self, ui: &mut Ui, entity_idx: usize, states: &mut States) {
         // Mark for deletion after all updates done adn data freed from ownership
-        let mut entity_for_deletion = SelectedEntity::new();
+        // let mut entity_for_deletion = SelectedEntity::new();
 
         match &mut states.main_page.entities[entity_idx] {
             Entity::COLLECTION(collection) => {
@@ -170,7 +171,10 @@ impl VisualEntity {
                     collection.is_folded = !collection.is_folded;
                 };
                 if delete_btn_resp.clicked() {
-                    entity_for_deletion.select_collection(entity_idx);
+                    states
+                        .main_page
+                        .deletion_entity
+                        .select_collection(entity_idx);
                 };
 
                 let requests_idxs = states
@@ -213,6 +217,12 @@ impl VisualEntity {
                                             .selected_entity
                                             .select_request(Some(entity_idx), request_idx);
                                     };
+                                    if request_delete_resp.clicked() {
+                                        states
+                                            .main_page
+                                            .deletion_entity
+                                            .select_request(Some(entity_idx), request_idx);
+                                    }
                                 }
                             });
                         });
@@ -241,14 +251,21 @@ impl VisualEntity {
                         .selected_entity
                         .select_request(None, entity_idx);
                 }
+
+                if request_delete_resp.clicked() {
+                    states
+                        .main_page
+                        .deletion_entity
+                        .select_request(None, entity_idx);
+                }
             }
         };
 
-        // If marked lovaly for delettion - transfer to global.
+        // If marked localy for delettion - transfer to global.
         // Later on this deletion will be processes in this frame.
-        if entity_for_deletion.is_selected() {
-            states.main_page.deletion_entity = entity_for_deletion;
-        }
+        // if entity_for_deletion.is_selected() {
+        //     states.main_page.deletion_entity = entity_for_deletion;
+        // }
     }
 
     /// Draw request  item
@@ -268,10 +285,22 @@ impl VisualEntity {
                 ui.style_mut().spacing.item_spacing = vec2(0., 0.);
                 ui.style_mut().spacing.button_padding = vec2(5., 8.);
                 let request_details_text = self.get_request_details_text(method, protocol);
+
+                // Truncatet name so layout wont break cos of overflow
+                let allowed_letters = (ui.available_size().x - 30.) / 8.5;
+                let request_text = if request_text.len() as f32 >= allowed_letters {
+                    &format!(
+                        "{}...",
+                        request_text.split_at(allowed_letters as usize - 3).0
+                    )
+                } else {
+                    request_text
+                };
+
                 let request_text = self.get_request_text(is_changed, request_text);
 
                 Frame::new()
-                    .inner_margin(Margin::symmetric(5, 8))
+                    .inner_margin(Margin::symmetric(5, 9))
                     .fill(style.color_light())
                     .show(ui, |ui| {
                         ui.add(
@@ -311,7 +340,7 @@ impl VisualEntity {
     }
 
     /// Draw collection folder item
-    /// Return tuplet: (fold_btn, folder_tbn, delete_btn) of responses
+    /// Return tuplet: (fold_btn, folder_btn, delete_btn) of responses
     fn update_collection_entity(
         &self,
         ui: &mut Ui,
@@ -341,6 +370,17 @@ impl VisualEntity {
 
                     ui.style_mut().spacing.button_padding = vec2(5., 7.);
 
+                    // Truncatet name so layout wont break cos of overflow
+                    let allowed_letters = (ui.available_size().x - 30.) / 7.;
+                    let collection_text = if collection_text.len() as f32 >= allowed_letters {
+                        &format!(
+                            "{}...",
+                            collection_text.split_at(allowed_letters as usize - 3).0
+                        )
+                    } else {
+                        collection_text
+                    };
+
                     let collection_folder_response = ui
                         .with_layout(Layout::top_down(Align::LEFT), |ui| {
                             // Button selectable of collection
@@ -349,7 +389,8 @@ impl VisualEntity {
                                 self.get_collection_text(!is_folded, &collection_text),
                             )
                             .corner_radius(CornerRadius::ZERO)
-                            .min_size(vec2(ui.available_size().x - 30., 15.));
+                            .min_size(vec2(ui.available_size().x - 30., 15.))
+                            .wrap_mode(TextWrapMode::Truncate);
 
                             let collection_folder_response = ui.add(collection_folder);
                             return collection_folder_response;

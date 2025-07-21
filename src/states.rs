@@ -1,6 +1,7 @@
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
+    vec::IntoIter,
 };
 
 use chrono::{DateTime, Local};
@@ -9,7 +10,7 @@ use egui::Color32;
 use crate::{
     settings::{Options as SettingsOptions, Settings, UISettings, UITheme},
     states::main_page::{Entity, MainPage},
-    ui::colors::ThemeColors,
+    ui::{colors::ThemeColors, fonts::Fonts},
 };
 
 pub mod main_page;
@@ -163,6 +164,10 @@ impl States {
             return;
         };
     }
+
+    pub fn events_count(&self) -> usize {
+        self.events.lock().unwrap().len()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -174,6 +179,7 @@ pub enum Theme {
 #[derive(Debug, Clone)]
 pub struct Style {
     pub theme: Theme,
+    pub fonts: Fonts,
 }
 
 impl From<&UISettings> for Style {
@@ -182,7 +188,10 @@ impl From<&UISettings> for Style {
             UITheme::Light => Theme::Light(ThemeColors::light()),
             UITheme::Dark => Theme::Dark(ThemeColors::dark()),
         };
-        Self { theme }
+        Self {
+            theme,
+            fonts: Fonts::new(),
+        }
     }
 }
 
@@ -277,6 +286,24 @@ impl Events {
     pub fn clear_events(&mut self) {
         self.items.clear();
     }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn get(&self, i: usize) -> &Event {
+        &self.items[i]
+    }
+}
+
+impl IntoIterator for Events {
+    type Item = Event;
+
+    type IntoIter = IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.into_iter()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -304,6 +331,14 @@ impl Event {
             message: msg.clone(),
             timestamp: Local::now(),
         })
+    }
+
+    pub fn get_data(&self) -> &EventData {
+        match self {
+            Event::Info(event_data) => event_data,
+            Event::Warning(event_data) => event_data,
+            Event::Error(event_data) => event_data,
+        }
     }
 }
 

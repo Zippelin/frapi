@@ -1,18 +1,17 @@
 use std::sync::Arc;
 
 use egui::{
-    text::LayoutJob, vec2, Align, Button, Color32, ComboBox, CornerRadius, FontFamily, FontId,
-    FontSelection, Frame, Label, Layout, Margin, RichText, ScrollArea, Sense, Separator, TextEdit,
-    TextFormat, TopBottomPanel, Ui, WidgetText,
+    vec2, Align, Button, ComboBox, CornerRadius, FontFamily, FontId, FontSelection, Frame, Layout,
+    Margin, RichText, ScrollArea, Separator, TextEdit, TopBottomPanel, Ui,
 };
 
 use crate::{
     settings::{Method, Protocol},
     states::{
-        main_page::{Entity, Header},
+        main_page::{Entity, Header, RequestDetails},
         States,
     },
-    ui::icons::Icon,
+    ui::{icons::Icon, main_page::central_panel::EntityDetailsHeaderButtons},
 };
 
 pub struct RequestDetailsPanel {}
@@ -36,11 +35,45 @@ impl RequestDetailsPanel {
         )
         .show_inside(ui, |ui| {
             ui.with_layout(Layout::top_down_justified(Align::LEFT), |ui| {
-                self.update_header(ui, states);
+                EntityDetailsHeaderButtons::update(ui, "Request".into(), states);
                 self.update_path(ui, states);
                 self.update_url(ui, states);
-                self.update_headers(ui, states);
+
+                // Button to select request part to change
+                ui.horizontal(|ui| {
+                    let request = states.main_page.selected_request_mut();
+                    if request.is_none() {
+                        return;
+                    };
+
+                    let request = request.unwrap();
+                    ui.radio_value(
+                        &mut request.visible_details,
+                        RequestDetails::Header,
+                        "Headers",
+                    );
+                    ui.radio_value(&mut request.visible_details, RequestDetails::Body, "Body");
+                    ui.add(Separator::default().horizontal());
+                });
+
+                ui.add_space(10.);
+
+                // Select view of request part
+                let request = states.main_page.selected_request().unwrap();
+                match request.visible_details {
+                    RequestDetails::Header => self.update_headers(ui, states),
+                    RequestDetails::Body => self.update_body(ui, states),
+                };
             })
+        });
+    }
+
+    fn update_body(&self, ui: &mut Ui, states: &mut States) {
+        ScrollArea::vertical().show(ui, |ui| {
+            Frame::new().inner_margin(Margin::same(5)).show(ui, |ui| {
+                let request = states.main_page.selected_request_mut().unwrap();
+                ui.add(TextEdit::multiline(&mut request.draft.body).min_size(ui.available_size()));
+            });
         });
     }
 
@@ -50,19 +83,9 @@ impl RequestDetailsPanel {
             let selected_collection_idx = states.main_page.selected_entity.collection_idx;
 
             ui.style_mut().spacing.item_spacing = vec2(3., 1.);
-            // match selected_collection {
-            //     Some(val) => {
-            //         if let Entity::COLLECTION(selected_collection) = &states.main_page.entities[val]
-            //         {
-            //             ui.label(&selected_collection.draft.name);
-            //         }
-            //         return;
-            //     }
-            //     None => {}
-            // }
 
             let current_collection_name = match states.main_page.selected_collection() {
-                Some(c) => c.draft.name.clone(),
+                Some(c) => format!("{} / ", c.draft.name.clone()),
                 None => "[root] /".into(),
             };
 
@@ -87,7 +110,10 @@ impl RequestDetailsPanel {
                             continue;
                         };
                         if let Entity::COLLECTION(collection) = &states.main_page.entities[i] {
-                            if ui.button(collection.draft.name.clone()).clicked() {
+                            if ui
+                                .button(format!("{} / ", collection.draft.name.clone()))
+                                .clicked()
+                            {
                                 // Planning move on after loop. We cant mutate this vec during loop itself
                                 states.main_page.request_move_target.add(Some(i));
                             }
@@ -132,11 +158,6 @@ impl RequestDetailsPanel {
 
         let request = request.unwrap();
 
-        ui.horizontal(|ui| {
-            ui.add(Label::new("Headers").selectable(false));
-            ui.add(Separator::default().horizontal())
-        });
-
         ScrollArea::vertical().show(ui, |ui| {
             ui.style_mut().spacing.item_spacing = vec2(2., 2.);
             ui.style_mut().visuals.widgets.active.corner_radius = CornerRadius::ZERO;
@@ -145,139 +166,66 @@ impl RequestDetailsPanel {
 
             let mut header_idx_for_remove = None;
 
-            Frame::new().inner_margin(Margin::same(15)).show(ui, |ui| {
-                for i in 0..request.draft.headers.len() {
+            Frame::new()
+                .inner_margin(Margin::same(10).left_top())
+                .show(ui, |ui| {
+                    for i in 0..request.draft.headers.len() {
+                        ui.horizontal(|ui| {
+                            let header_key_resp = ui.add(
+                                TextEdit::singleline(&mut request.draft.headers[i].key)
+                                    .text_color(states.style.color_main())
+                                    .font(states.style.fonts.textedit_small()),
+                            );
+                            let header_value_reasp = ui.add(
+                                TextEdit::singleline(&mut request.draft.headers[i].value)
+                                    .desired_width(ui.available_width() - 25.)
+                                    .text_color(states.style.color_main())
+                                    .font(states.style.fonts.textedit_small()),
+                            );
+
+                            if header_key_resp.changed() || header_value_reasp.changed() {
+                                request.is_changed = true
+                            }
+
+                            if ui
+                                .add(Button::new("x").fill(states.style.color_danger()))
+                                .clicked()
+                            {
+                                header_idx_for_remove = Some(i);
+                            }
+                        });
+                    }
+
+                    // Deleting marked header
+                    if header_idx_for_remove.is_some() {
+                        request
+                            .draft
+                            .headers
+                            .swap_remove(header_idx_for_remove.take().unwrap());
+                        request.is_changed = true;
+                    }
+
                     ui.horizontal(|ui| {
-                        let header_key_resp = ui.add(
-                            TextEdit::singleline(&mut request.draft.headers[i].key)
-                                .text_color(states.style.color_main()),
+                        let new_header_key_resp =
+                            ui.text_edit_singleline(&mut request.new_header.key);
+                        let new_header_val_resp = ui.add(
+                            TextEdit::singleline(&mut request.new_header.value)
+                                .desired_width(ui.available_width() - 25.),
                         );
-                        let header_value_reasp = ui.add(
-                            TextEdit::singleline(&mut request.draft.headers[i].value)
-                                .desired_width(ui.available_width() - 25.)
-                                .text_color(states.style.color_main()),
-                        );
+                        if new_header_key_resp.changed() || new_header_val_resp.changed() {
+                            if request.new_header.key != "" || request.new_header.value != "" {
+                                request.draft.headers.push(Header {
+                                    key: request.new_header.key.clone(),
+                                    value: request.new_header.value.clone(),
+                                });
 
-                        if header_key_resp.changed() || header_value_reasp.changed() {
-                            request.is_changed = true
-                        }
-
-                        if ui
-                            .add(Button::new("x").fill(states.style.color_danger()))
-                            .clicked()
-                        {
-                            header_idx_for_remove = Some(i);
+                                request.new_header.key = "".into();
+                                request.new_header.value = "".into();
+                                request.is_changed = true
+                            }
                         }
                     });
-                }
-
-                // Deleting marked header
-                if header_idx_for_remove.is_some() {
-                    request
-                        .draft
-                        .headers
-                        .swap_remove(header_idx_for_remove.take().unwrap());
-                    request.is_changed = true;
-                }
-
-                ui.horizontal(|ui| {
-                    let new_header_key_resp = ui.text_edit_singleline(&mut request.new_header.key);
-                    let new_header_val_resp = ui.add(
-                        TextEdit::singleline(&mut request.new_header.value)
-                            .desired_width(ui.available_width() - 25.),
-                    );
-                    if new_header_key_resp.changed() || new_header_val_resp.changed() {
-                        if request.new_header.key != "" || request.new_header.value != "" {
-                            request.draft.headers.push(Header {
-                                key: request.new_header.key.clone(),
-                                value: request.new_header.value.clone(),
-                            });
-
-                            request.new_header.key = "".into();
-                            request.new_header.value = "".into();
-                            request.is_changed = true
-                        }
-                    }
                 });
-            });
-        });
-    }
-
-    fn update_header(&self, ui: &mut Ui, states: &mut States) {
-        let mut header_text = LayoutJob::default();
-        header_text.append(
-            "Request Details",
-            0.,
-            TextFormat {
-                color: Color32::DARK_GRAY,
-                font_id: FontId::new(15.0, FontFamily::Monospace),
-
-                ..Default::default()
-            },
-        );
-        ui.horizontal(|ui| {
-            ui.add(Label::new(header_text).selectable(false));
-
-            ui.add_space(ui.available_width() - 135.);
-
-            ui.group(|ui| {
-                ui.style_mut().spacing.button_padding = vec2(10., 10.);
-                let entity_is_changed = states.main_page.entity_is_changed();
-                if ui
-                    .add(
-                        Button::new(WidgetText::RichText(Arc::new(
-                            RichText::new("cancel")
-                                .color(if entity_is_changed {
-                                    Color32::WHITE
-                                } else {
-                                    states.style.color_main()
-                                })
-                                .size(13.)
-                                .monospace(),
-                        )))
-                        .sense(if entity_is_changed {
-                            Sense::click()
-                        } else {
-                            Sense::empty()
-                        })
-                        .fill(if entity_is_changed {
-                            states.style.color_danger()
-                        } else {
-                            states.style.color_secondary()
-                        }),
-                    )
-                    .clicked()
-                {
-                    states.main_page.cancel_changes_of_selected_entity();
-                };
-                if ui
-                    .add(
-                        Button::new(WidgetText::RichText(Arc::new(
-                            RichText::new("save")
-                                .color(if entity_is_changed {
-                                    Color32::WHITE
-                                } else {
-                                    states.style.color_main()
-                                })
-                                .monospace()
-                                .size(13.),
-                        )))
-                        .sense(if entity_is_changed {
-                            Sense::click()
-                        } else {
-                            Sense::empty()
-                        })
-                        .fill(if entity_is_changed {
-                            states.style.color_success()
-                        } else {
-                            states.style.color_secondary()
-                        }),
-                    )
-                    .clicked()
-                {
-                    states.save_selected(None);
-                };
-            });
         });
     }
 
@@ -368,10 +316,7 @@ impl RequestDetailsPanel {
                             .desired_width(ui.available_width() - 45.)
                             .text_color(states.style.color_main())
                             .background_color(states.style.color_lighter())
-                            .font(FontSelection::FontId(FontId {
-                                size: 16.,
-                                family: FontFamily::Monospace,
-                            })),
+                            .font(states.style.fonts.textedit_big()),
                     );
 
                     if request_url_resp.changed() {
@@ -380,16 +325,16 @@ impl RequestDetailsPanel {
                     let request_executor_is_free = request.executor_is_free();
 
                     ui.style_mut().spacing.button_padding = vec2(10., 4.);
-                    if ui
-                        .add(Button::new(Icon::go()).fill(if request_executor_is_free {
+                    let execute_reqeust_btn_resp =
+                        ui.add(Button::new(Icon::go()).fill(if request_executor_is_free {
                             states.style.color_success()
                         } else {
                             states.style.color_danger()
-                        }))
-                        .clicked()
-                        && request_executor_is_free
-                    {
+                        }));
+                    if execute_reqeust_btn_resp.clicked() && request_executor_is_free {
                         request.go(Arc::clone(&states.events));
+                    } else if execute_reqeust_btn_resp.clicked() && !request_executor_is_free {
+                        request.termiate();
                     };
                 });
             });
