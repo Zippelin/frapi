@@ -61,6 +61,7 @@ impl Entity {
 pub enum RequestDetails {
     Header,
     Body,
+    QueryParams,
 }
 
 /// Request Entity state represenation
@@ -203,6 +204,11 @@ impl Request {
     pub fn details_to_body(&mut self) {
         self.visible_details = RequestDetails::Body
     }
+
+    /// Parse Url string
+    pub fn parse_url(&mut self) {
+        self.draft.parse_url();
+    }
 }
 
 /// Collection Entity representation
@@ -288,6 +294,7 @@ impl Collection {
     }
 }
 
+// TODO: add enabled o disabled status of header - also need changes in settings
 /// Header of Request State
 #[derive(Debug, Clone)]
 pub struct Header {
@@ -313,6 +320,7 @@ pub struct RequestData {
     pub uri: String,
     pub headers: Vec<Header>,
     pub body: String,
+    pub query_string: Vec<Header>,
 }
 
 /// From Settigns -> State
@@ -345,6 +353,7 @@ impl From<&RequestSettings> for RequestData {
             uri: value.uri.clone(),
             headers,
             body: "".into(),
+            query_string: vec![],
         }
     }
 }
@@ -358,6 +367,7 @@ impl RequestData {
             uri: "".into(),
             headers: vec![],
             body: "".into(),
+            query_string: vec![],
         }
     }
     /// Copy from other Self.
@@ -378,6 +388,68 @@ impl RequestData {
             })
             .collect();
     }
+
+    /// Parse Url string
+    pub fn parse_url(&mut self) {
+        self.parse_url_protocol();
+        self.parse_query_params();
+    }
+
+    fn parse_url_protocol(&mut self) {
+        let url = self.uri.to_lowercase();
+        let mut split_url = if url.starts_with("http:") {
+            self.protocol = Protocol::HTTP;
+            url.split_at(5).1.to_string()
+        } else if url.starts_with("https:") {
+            self.protocol = Protocol::HTTPS;
+            url.split_at(6).1.to_string()
+        } else if url.starts_with("ws:") {
+            self.protocol = Protocol::WS;
+            url.split_at(3).1.to_string()
+        } else if url.starts_with("wss:") {
+            self.protocol = Protocol::WSS;
+            url.split_at(4).1.to_string()
+        } else {
+            self.protocol = Protocol::HTTPS;
+            url
+        };
+
+        while split_url.starts_with("\\") || split_url.starts_with("/") {
+            split_url = split_url.split_at(1).1.to_string();
+        }
+        self.uri = split_url;
+    }
+
+    /// Parse from URL QeryParams
+    fn parse_query_params(&mut self) {
+        let url = self.uri.clone();
+        let url_parts = url.split_once("?");
+
+        let mut query_strings_vec: Vec<Header> = vec![];
+        if let Some((_, query_string_part)) = url_parts {
+            let query_strings = query_string_part.split("&");
+            for part in query_strings {
+                let part_split = part.split_once("=");
+
+                if let Some((part_key, part_value)) = part_split {
+                    query_strings_vec.push(Header {
+                        key: part_key.to_string(),
+                        value: part_value.to_string(),
+                    });
+                } else {
+                    query_strings_vec.push(Header {
+                        key: part.to_string(),
+                        value: "".into(),
+                    });
+                }
+            }
+
+            self.query_string = query_strings_vec;
+        };
+    }
+
+    /// Constructing URL from base url and QueryParams
+    pub fn contruct_url(&self) {}
 }
 
 /// Collection data representation

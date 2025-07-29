@@ -8,8 +8,8 @@ use egui::{
 use crate::{
     settings::{Method, Protocol},
     states::{
-        main_page::{Entity, Header, RequestDetails},
-        States,
+        main_page::{Entity, Header, Request, RequestDetails},
+        States, Style,
     },
     ui::{icons::Icon, main_page::central_panel::EntityDetailsHeaderButtons},
 };
@@ -58,15 +58,21 @@ impl RequestDetailsPanel {
 
                 ui.add_space(10.);
 
+                // TODO: add layout for WS requests
+                // TODO: add query params
+
                 // Select view of request part
                 let request = states.main_page.selected_request().unwrap();
                 match request.visible_details {
                     RequestDetails::Header => self.update_headers(ui, states),
                     RequestDetails::Body => self.update_body(ui, states),
+                    RequestDetails::QueryParams => self.update_query_params(ui, states),
                 };
             })
         });
     }
+
+    fn update_query_params(&self, ui: &mut Ui, states: &mut States) {}
 
     fn update_body(&self, ui: &mut Ui, states: &mut States) {
         ScrollArea::vertical().show(ui, |ui| {
@@ -148,16 +154,7 @@ impl RequestDetailsPanel {
         });
     }
 
-    /// Draw headers Table
-    fn update_headers(&self, ui: &mut Ui, states: &mut States) {
-        let request = states.main_page.selected_request_mut();
-
-        if request.is_none() {
-            return;
-        };
-
-        let request = request.unwrap();
-
+    fn update_generic_headers_table(&self, ui: &mut Ui, request: &mut Request, style: &Style) {
         ScrollArea::vertical().show(ui, |ui| {
             ui.style_mut().spacing.item_spacing = vec2(2., 2.);
             ui.style_mut().visuals.widgets.active.corner_radius = CornerRadius::ZERO;
@@ -173,14 +170,14 @@ impl RequestDetailsPanel {
                         ui.horizontal(|ui| {
                             let header_key_resp = ui.add(
                                 TextEdit::singleline(&mut request.draft.headers[i].key)
-                                    .text_color(states.style.color_main())
-                                    .font(states.style.fonts.textedit_small()),
+                                    .text_color(style.color_main())
+                                    .font(style.fonts.textedit_small()),
                             );
                             let header_value_reasp = ui.add(
                                 TextEdit::singleline(&mut request.draft.headers[i].value)
                                     .desired_width(ui.available_width() - 25.)
-                                    .text_color(states.style.color_main())
-                                    .font(states.style.fonts.textedit_small()),
+                                    .text_color(style.color_main())
+                                    .font(style.fonts.textedit_small()),
                             );
 
                             if header_key_resp.changed() || header_value_reasp.changed() {
@@ -188,7 +185,7 @@ impl RequestDetailsPanel {
                             }
 
                             if ui
-                                .add(Button::new("x").fill(states.style.color_danger()))
+                                .add(Button::new("x").fill(style.color_danger()))
                                 .clicked()
                             {
                                 header_idx_for_remove = Some(i);
@@ -229,21 +226,106 @@ impl RequestDetailsPanel {
         });
     }
 
+    /// Draw headers Table
+    fn update_headers(&self, ui: &mut Ui, states: &mut States) {
+        let request = states.main_page.selected_request_mut();
+
+        if request.is_none() {
+            return;
+        };
+
+        let request = request.unwrap();
+
+        self.update_generic_headers_table(ui, request, &states.style);
+
+        // ScrollArea::vertical().show(ui, |ui| {
+        //     ui.style_mut().spacing.item_spacing = vec2(2., 2.);
+        //     ui.style_mut().visuals.widgets.active.corner_radius = CornerRadius::ZERO;
+        //     ui.style_mut().visuals.widgets.inactive.corner_radius = CornerRadius::ZERO;
+        //     ui.style_mut().visuals.widgets.hovered.corner_radius = CornerRadius::ZERO;
+
+        //     let mut header_idx_for_remove = None;
+
+        //     Frame::new()
+        //         .inner_margin(Margin::same(10).left_top())
+        //         .show(ui, |ui| {
+        //             for i in 0..request.draft.headers.len() {
+        //                 ui.horizontal(|ui| {
+        //                     let header_key_resp = ui.add(
+        //                         TextEdit::singleline(&mut request.draft.headers[i].key)
+        //                             .text_color(states.style.color_main())
+        //                             .font(states.style.fonts.textedit_small()),
+        //                     );
+        //                     let header_value_reasp = ui.add(
+        //                         TextEdit::singleline(&mut request.draft.headers[i].value)
+        //                             .desired_width(ui.available_width() - 25.)
+        //                             .text_color(states.style.color_main())
+        //                             .font(states.style.fonts.textedit_small()),
+        //                     );
+
+        //                     if header_key_resp.changed() || header_value_reasp.changed() {
+        //                         request.is_changed = true
+        //                     }
+
+        //                     if ui
+        //                         .add(Button::new("x").fill(states.style.color_danger()))
+        //                         .clicked()
+        //                     {
+        //                         header_idx_for_remove = Some(i);
+        //                     }
+        //                 });
+        //             }
+
+        //             // Deleting marked header
+        //             if header_idx_for_remove.is_some() {
+        //                 request
+        //                     .draft
+        //                     .headers
+        //                     .swap_remove(header_idx_for_remove.take().unwrap());
+        //                 request.is_changed = true;
+        //             }
+
+        //             ui.horizontal(|ui| {
+        //                 let new_header_key_resp =
+        //                     ui.text_edit_singleline(&mut request.new_header.key);
+        //                 let new_header_val_resp = ui.add(
+        //                     TextEdit::singleline(&mut request.new_header.value)
+        //                         .desired_width(ui.available_width() - 25.),
+        //                 );
+        //                 if new_header_key_resp.changed() || new_header_val_resp.changed() {
+        //                     if request.new_header.key != "" || request.new_header.value != "" {
+        //                         request.draft.headers.push(Header {
+        //                             key: request.new_header.key.clone(),
+        //                             value: request.new_header.value.clone(),
+        //                         });
+
+        //                         request.new_header.key = "".into();
+        //                         request.new_header.value = "".into();
+        //                         request.is_changed = true
+        //                     }
+        //                 }
+        //             });
+        //         });
+        // });
+    }
+
+    // TODO: add parsing for protocol and query params
     /// Draw URL group
     fn update_url(&self, ui: &mut Ui, states: &mut States) {
+        let id_salt = states.main_page.selected_request_salt();
+
+        let request = states.main_page.selected_request_mut();
+        if request.is_none() {
+            return;
+        }
+
+        let request = request.unwrap();
+
         ui.with_layout(Layout::top_down_justified(Align::LEFT), |ui| {
-            let id_salt = states.main_page.selected_request_salt();
-
-            let request = states.main_page.selected_request_mut();
-            if request.is_none() {
-                return;
-            }
-
-            let request = request.unwrap();
-
             ui.group(|ui| {
                 ui.with_layout(Layout::left_to_right(Align::LEFT), |ui| {
                     ui.style_mut().spacing.button_padding = vec2(5., 4.);
+
                     ComboBox::from_id_salt(format!("selected-request-methods-{}", id_salt))
                         .selected_text(format!("{}", request.draft.method))
                         .width(70.)
@@ -320,6 +402,7 @@ impl RequestDetailsPanel {
                     );
 
                     if request_url_resp.changed() {
+                        request.parse_url();
                         request.is_changed = true
                     };
                     let request_executor_is_free = request.executor_is_free();

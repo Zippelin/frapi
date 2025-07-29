@@ -1,4 +1,4 @@
-use egui::{Align, Context, Frame, Label, Layout, Margin, Separator, TopBottomPanel};
+use egui::{Context, Frame, Label, Margin, Separator, TopBottomPanel};
 
 use crate::states::States;
 

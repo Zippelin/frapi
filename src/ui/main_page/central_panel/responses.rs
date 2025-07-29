@@ -102,6 +102,7 @@ impl ResponsesListPanel {
                         .background_color(style.color_light()),
                 );
             }
+            // TODO: add headers of response
             ResponseView::HEADERS => todo!(),
         };
     }

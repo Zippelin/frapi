@@ -8,10 +8,7 @@ use egui::{
 
 use crate::{
     settings::{Method, Protocol},
-    states::{
-        main_page::{Entity, SelectedEntity},
-        States, Style,
-    },
+    states::{main_page::Entity, States, Style},
     ui::icons::Icon,
 };
 

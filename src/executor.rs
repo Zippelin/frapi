@@ -140,6 +140,8 @@ impl From<&RequestData> for CommandExecute {
     }
 }
 
+// TODO: add events adn errors or warn on bad responses
+
 /// Executor engine
 #[derive(Debug, Clone)]
 pub struct Executor {
