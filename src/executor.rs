@@ -6,19 +6,19 @@ use std::{
 
 use tokio_tungstenite::tungstenite::Message as TokioMessage;
 
-use futures::{SinkExt, StreamExt, TryStreamExt};
+use futures::{executor::block_on, SinkExt, StreamExt, TryStreamExt};
 use reqwest::Client;
 use tokio::{
     select,
     sync::mpsc::{channel, Receiver, Sender},
-    time::sleep,
+    time,
 };
 use tokio_tungstenite::connect_async;
 
 use crate::{
     settings::{Method, Protocol},
     states::{
-        main_page::{Header, RequestData, Response},
+        main_page::{generics::Header, request::request_data::RequestData, response::Response},
         Events,
     },
 };
@@ -102,6 +102,13 @@ impl Command {
     pub fn termiate() -> Self {
         Self::TERRMINATE
     }
+
+    pub fn drop_message(&mut self) {
+        match self {
+            Command::EXECUTE(command_execute) => command_execute.message = "".into(),
+            Command::TERRMINATE => {}
+        }
+    }
 }
 
 /// Executor result
@@ -117,6 +124,7 @@ pub struct CommandExecute {
     pub method: Method,
     pub headers: Vec<Header>,
     pub body: String,
+    pub message: String,
 }
 
 /// From RequestData -> command to execute on executor
@@ -135,12 +143,13 @@ impl From<&RequestData> for CommandExecute {
             protocol: value.protocol.clone(),
             method: value.method.clone(),
             headers,
-            body: value.body.clone(),
+            body: value.body.message.clone(),
+            message: value.message.message.clone(),
         }
     }
 }
 
-// TODO: add events adn errors or warn on bad responses
+// TODO: add events and errors or warn on bad responses
 
 /// Executor engine
 #[derive(Debug, Clone)]
@@ -162,8 +171,16 @@ impl Executor {
         }
     }
 
-    /// execute action based on payload
-    pub fn execute(&mut self, data: &RequestData, events: Arc<Mutex<Events>>) {
+    /// execute action based on payload.
+    /// data - request data.
+    /// connection_only - mean we need initiate only connection, without sending 1st message.
+    ///     Ignored when WS already connected or when protocot is HTTP-like.
+    pub fn execute(
+        &mut self,
+        data: &RequestData,
+        connection_only: bool,
+        events: Arc<Mutex<Events>>,
+    ) {
         let message: Message = data.into();
 
         let state = match self.state.lock() {
@@ -198,7 +215,7 @@ impl Executor {
                 .event_info(&format!("Detected free executor, sending http request..."));
             *self.state.lock().unwrap() = State::BUSY;
             if let Some(command) = message.get_command() {
-                self.execute_http(command, events);
+                self.spawn_http_connection(command, events);
             }
 
             return;
@@ -211,8 +228,13 @@ impl Executor {
                 "Detected free executor, sending websocket request..."
             ));
             *self.state.lock().unwrap() = State::CONNECTED;
-            if let Some(command) = message.get_command() {
-                self.connect_ws(command, events);
+            if let Some(mut command) = message.get_command() {
+                // If we need only connection - removing data from command, so it wont be executed during connection initialization
+                if connection_only {
+                    command.drop_message();
+                };
+
+                self.spawn_ws_connection(command, events);
             }
 
             return;
@@ -236,7 +258,7 @@ impl Executor {
     }
 
     /// Spawn separate thread for http reqeusts
-    fn execute_http(&mut self, message: Command, events: Arc<Mutex<Events>>) {
+    fn spawn_http_connection(&mut self, message: Command, events: Arc<Mutex<Events>>) {
         let (sender, receiver) = channel::<Message>(100);
         self.channel_sender = Some(sender);
 
@@ -313,7 +335,6 @@ impl Executor {
                     command_channel.recv().await;
                 };
 
-                println!("select go!");
                 select! {
                     _ = request_future => {
                         *executor_state.lock().unwrap() = State::FREE;
@@ -331,12 +352,12 @@ impl Executor {
     }
 
     /// Spawn separate thread for websocket
-    fn connect_ws(&mut self, message: Command, events: Arc<Mutex<Events>>) {
+    fn spawn_ws_connection(&mut self, command: Command, events: Arc<Mutex<Events>>) {
         let (sender, receiver) = channel::<Message>(100);
         self.channel_sender = Some(sender);
 
         tokio::spawn(Self::ws_thread(
-            message,
+            command,
             Arc::clone(&self.responses),
             Arc::clone(&events),
             receiver,
@@ -355,18 +376,42 @@ impl Executor {
         let _ = events;
         match command {
             Command::EXECUTE(command_execute) => {
-                let uri = format!("{}://{}", command_execute.protocol, command_execute.uri);
+                let uri = format!(
+                    "{}://{}",
+                    command_execute.protocol.to_string().to_lowercase(),
+                    command_execute.uri
+                );
 
                 let (ws_stream, _) = match connect_async(&uri).await {
                     Ok(data) => data,
                     Err(err) => {
-                        println!("Error: Could not connect to WS. Error: {err}");
+                        events
+                            .lock()
+                            .unwrap()
+                            .event_error(&format!("Error: Could not connect to WS. Error: {err}"));
+
                         *executor_state.lock().unwrap() = State::FREE;
                         return;
                     }
                 };
 
+                let mut request_interval = time::interval(Duration::from_millis(60));
+
                 let (mut write, mut read) = ws_stream.split();
+
+                events
+                    .lock()
+                    .unwrap()
+                    .event_info(&"Websocket: start messages loop...".into());
+
+                // if have some initial command on ws connection sending it
+                if command_execute.message.len() > 0 {
+                    let _ = write
+                        .send(tokio_tungstenite::tungstenite::Message::text(
+                            command_execute.message.clone(),
+                        ))
+                        .await;
+                }
 
                 loop {
                     select! {
@@ -375,13 +420,24 @@ impl Executor {
                                 Ok(Some(val)) => {
                                     match val {
                                         TokioMessage::Text(utf8_bytes) => {
+                                            events
+                                                .lock()
+                                                .unwrap()
+                                                .event_info(&format!("Websocket: received response"));
                                             responses.lock().unwrap().push(
                                                 Response::from_utf8_bytes(utf8_bytes)
                                             );
                                             continue;
                                         },
                                         TokioMessage::Close(_) => {
-                                            println!("Peer close connection.");
+                                            events
+                                                .lock()
+                                                .unwrap()
+                                                .event_warning(&"Peer close connection.".into());
+
+                                            responses.lock().unwrap().push(
+                                                Response::closed_connection()
+                                            );
                                             *executor_state.lock().unwrap() = State::FREE;
                                             break;
                                         },
@@ -392,39 +448,68 @@ impl Executor {
                                 },
                                 Ok(None) => {continue;}
                                 Err(e) =>{
-                                    println!("Error: During WS connection on new message error occured. Error: {e}");
+                                    events
+                                        .lock()
+                                        .unwrap()
+                                        .event_error(&format!("Error: During WS connection on new message error occured. Error: {e}"));
+                                    responses.lock().unwrap().push(
+                                        Response::closed_connection()
+                                    );
                                     *executor_state.lock().unwrap() = State::FREE;
                                     break;
                                 }
                             };
                         }
-                        _ = sleep(Duration::from_millis(50)) => {
-                            let message = command_channel.recv().await.unwrap();
+
+                        // Checking requests queue to send
+                        _ = request_interval.tick() => {
+
+                            let channel_event = command_channel.try_recv();
+
+                            let message = match channel_event {
+                                Ok(val) => val,
+                                Err(_) => continue,
+                            };
 
                             match message {
                                 Message::COMMAND(command) => match command {
                                     Command::EXECUTE(command_execute) => {
+                                        events
+                                            .lock()
+                                            .unwrap()
+                                            .event_info(&format!("Websocket: sending message"));
                                         let result = write
                                             .send(tokio_tungstenite::tungstenite::Message::text(
-                                                command_execute.body.clone(),
+                                                command_execute.message.clone(),
                                             ))
                                             .await;
 
                                         match result {
                                             Ok(_) => {}
                                             Err(err) => {
-                                                println!("Error: Could not send message to WS channel. Message: {}. Error: {}",command_execute.body.clone(), err);
+                                                events
+                                                    .lock()
+                                                    .unwrap()
+                                                    .event_error(&format!("Error: Could not send message to WS channel. Message: {}. Error: {}",command_execute.body.clone(), err));
                                             }
                                         };
                                     }
                                     Command::TERRMINATE => {
-                                        println!("Requested WS termination.");
+                                        events
+                                            .lock()
+                                            .unwrap()
+                                            .event_info(&"Websocket: requested WS termination.".into());
+
                                         *executor_state.lock().unwrap() = State::FREE;
                                         break;
                                     }
                                 },
                                 Message::RESULT(result) => {
-                                    println!("Error: Received in command channel Result type: {result:#?}");
+                                    events
+                                        .lock()
+                                        .unwrap()
+                                        .event_warning(&format!("Error: Received in command channel Result type: {result:#?}"));
+
                                 }
                             };
                         }
@@ -433,6 +518,11 @@ impl Executor {
                 }
             }
             Command::TERRMINATE => {
+                events
+                    .lock()
+                    .unwrap()
+                    .event_info(&"Requested WS termination.".into());
+
                 *executor_state.lock().unwrap() = State::FREE;
                 return;
             }
@@ -445,6 +535,6 @@ impl Executor {
             *self.state.lock().unwrap() = State::FREE;
             return;
         };
-        let _ = self.channel_sender.as_mut().unwrap().send(message);
+        let _ = block_on(self.channel_sender.as_mut().unwrap().send(message));
     }
 }

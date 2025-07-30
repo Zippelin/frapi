@@ -10,8 +10,8 @@ use serde_json::Value;
 
 use crate::states::{
     main_page::{
-        Collection as StateCollection, Entity as StateEntity, Header as StateHeader, MainPage,
-        Request as StateRequest,
+        collection::Collection as StateCollection, entity::Entity as StateEntity,
+        generics::Header as StateHeader, request::Request as StateRequest, MainPage,
     },
     Options as StateOptions, States, Style, Theme,
 };
@@ -356,6 +356,7 @@ pub struct RequestSettings {
     pub uri: String,
     pub headers: Vec<Header>,
     pub body: String,
+    pub message: String,
 }
 
 impl From<&StateRequest> for RequestSettings {
@@ -373,7 +374,8 @@ impl From<&StateRequest> for RequestSettings {
             method: value.draft.method.clone(),
             uri: value.draft.uri.clone(),
             headers,
-            body: value.draft.body.clone(),
+            body: value.draft.body.message.clone(),
+            message: value.draft.message.message.clone(),
         }
     }
 }
@@ -393,7 +395,8 @@ impl RequestSettings {
             method: value.original.method.clone(),
             uri: value.original.uri.clone(),
             headers,
-            body: value.original.body.clone(),
+            body: value.original.body.message.clone(),
+            message: value.original.message.message.clone(),
         }
     }
 }
@@ -448,7 +451,7 @@ impl Into<reqwest::Method> for Method {
             Method::POST => reqwest::Method::POST,
             Method::PUT => reqwest::Method::PUT,
             Method::PATCH => reqwest::Method::PATCH,
-            // TODO: в либе нет такого метода - нужно будет разобраться
+            // TODO: reqwester dont support this
             //HTTPMethod::UPDATE => Method::PATCH,
             Method::DELETE => reqwest::Method::DELETE,
         }
@@ -526,6 +529,7 @@ mod tests {
                 header_4.clone(),
             ],
             body: "".into(),
+            message: "".into(),
         };
 
         let request_1 = RequestSettings {
@@ -541,6 +545,7 @@ mod tests {
                 header_4.clone(),
             ],
             body: "".into(),
+            message: "".into(),
         };
 
         let request_2 = RequestSettings {
@@ -556,6 +561,7 @@ mod tests {
                 header_4.clone(),
             ],
             body: "".into(),
+            message: "".into(),
         };
 
         let collection_1 = CollectionSettings {
@@ -578,6 +584,7 @@ mod tests {
                 header_4.clone(),
             ],
             body: "".into(),
+            message: "".into(),
         };
 
         let collection_2 = CollectionSettings {
@@ -600,6 +607,7 @@ mod tests {
                 header_4.clone(),
             ],
             body: "".into(),
+            message: "".into(),
         };
 
         let main_page = MainPageSettings {
@@ -627,7 +635,8 @@ mod tests {
             .append(false)
             .create(true)
             .write(true)
-            .open("/Users/denis/rustProjects/frapi_v2/cache.json")
+            .truncate(true)
+            .open(default_settings_filepath())
             .unwrap();
 
         let mut buffer = BufWriter::new(&file);

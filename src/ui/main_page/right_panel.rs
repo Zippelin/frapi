@@ -33,7 +33,7 @@ impl RightPanel {
                 ScrollArea::vertical().show(ui, |ui| {
                     let event_guard = states.events.lock().unwrap();
                     let events = &*event_guard;
-                    for i in 0..events.len() {
+                    for i in (0..events.len()).rev() {
                         Frame::new()
                             .inner_margin(Margin::same(5))
                             .fill(states.style.color_main())

@@ -158,17 +158,16 @@ impl MainMenu {
                         ui.add_space(10.);
                         ui.add(
                             Label::new(
-                                "This is open source application for track and work with requests.",
+                                "This is free and light HTTP requests tracker and tester. Easy to use and easy to copy between desktops.",
                             )
                             .selectable(false),
                         );
                         ui.add(
-                            Label::new("Application developed with Rust only.").selectable(false),
+                            Label::new("Application based on Rust lang").selectable(false),
                         );
                         ui.add_space(10.);
-                        ui.add(Label::new("License: MIT").selectable(false));
+                        ui.add(Label::new("License: FreeWare").selectable(false));
                         ui.add(Label::new("GitHub: ___").selectable(false));
-                        ui.add(Label::new("Support: ___").selectable(false));
                         ui.add_space(10.);
                         ui.add(Label::new("@ 2025 Frapi Team").selectable(false));
                     })

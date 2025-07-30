@@ -5,132 +5,8 @@
   "main_page": {
     "entities": [
       {
-        "COLLECTION": {
-          "id": "58a325a8-ea48-49b7-87fa-c9d1581e9c27",
-          "name": "Collection 1",
-          "description": "Description for Collection 1",
-          "requests": [
-            {
-              "id": "b50bf7d9-bfd3-4e90-8a71-95fa5cf52e50",
-              "name": "request to yandex",
-              "protocol": "HTTPS",
-              "method": "GET",
-              "uri": "ya.ru",
-              "headers": [
-                {
-                  "key": "Host",
-                  "value": "developer.mozilla.org"
-                },
-                {
-                  "key": "User-Agent",
-                  "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
-                },
-                {
-                  "key": "Upgrade-Insecure-Requests",
-                  "value": 1
-                },
-                {
-                  "key": "fake-bool",
-                  "value": true
-                }
-              ],
-              "body": ""
-            },
-            {
-              "id": "3e551b2d-c10c-48a4-a54f-89105d82930a",
-              "name": "request to google",
-              "protocol": "HTTPS",
-              "method": "GET",
-              "uri": "google.ru",
-              "headers": [
-                {
-                  "key": "Host",
-                  "value": "developer.mozilla.org"
-                },
-                {
-                  "key": "User-Agent",
-                  "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
-                },
-                {
-                  "key": "Upgrade-Insecure-Requests",
-                  "value": 1
-                },
-                {
-                  "key": "fake-bool",
-                  "value": true
-                }
-              ],
-              "body": ""
-            }
-          ]
-        }
-      },
-      {
-        "COLLECTION": {
-          "id": "1becdc39-f24b-4c73-8264-0e32da14b439",
-          "name": "Collection 2",
-          "description": "Description for Collection 2",
-          "requests": [
-            {
-              "id": "a8a2cc1b-45fe-457b-af33-79a5b03ef4ef",
-              "name": "request to microsoft",
-              "protocol": "HTTPS",
-              "method": "GET",
-              "uri": "microsoft.ru",
-              "headers": [
-                {
-                  "key": "Host",
-                  "value": "developer.mozilla.org"
-                },
-                {
-                  "key": "User-Agent",
-                  "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
-                },
-                {
-                  "key": "Upgrade-Insecure-Requests",
-                  "value": 1
-                },
-                {
-                  "key": "fake-bool",
-                  "value": true
-                }
-              ],
-              "body": ""
-            }
-          ]
-        }
-      },
-      {
         "REQUEST": {
-          "id": "f8e18500-5a19-4b8d-8847-7ff1eed25962",
-          "name": "request to mail",
-          "protocol": "HTTPS",
-          "method": "GET",
-          "uri": "mail.ru",
-          "headers": [
-            {
-              "key": "Host",
-              "value": "developer.mozilla.org"
-            },
-            {
-              "key": "User-Agent",
-              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
-            },
-            {
-              "key": "Upgrade-Insecure-Requests",
-              "value": 1
-            },
-            {
-              "key": "fake-bool",
-              "value": true
-            }
-          ],
-          "body": ""
-        }
-      },
-      {
-        "REQUEST": {
-          "id": "d938fa5d-e1ee-4de6-ae94-fb81acf5f090",
+          "id": "a50bd844-7b9b-45df-81f6-0010d8f9c82d",
           "name": "request to firebase",
           "protocol": "HTTPS",
           "method": "GET",
@@ -153,7 +29,148 @@
               "value": true
             }
           ],
-          "body": ""
+          "body": "",
+          "message": ""
+        }
+      },
+      {
+        "COLLECTION": {
+          "id": "401982d3-8688-457f-9200-b4e333904e24",
+          "name": "Collection 1",
+          "description": "Description for Collection 1",
+          "requests": [
+            {
+              "id": "5253db81-f76e-4287-b034-cd5472884f4c",
+              "name": "request to yandex",
+              "protocol": "HTTPS",
+              "method": "GET",
+              "uri": "ya.ru",
+              "headers": [
+                {
+                  "key": "Host",
+                  "value": "developer.mozilla.org"
+                },
+                {
+                  "key": "User-Agent",
+                  "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
+                },
+                {
+                  "key": "Upgrade-Insecure-Requests",
+                  "value": 1
+                },
+                {
+                  "key": "fake-bool",
+                  "value": true
+                }
+              ],
+              "body": "",
+              "message": ""
+            },
+            {
+              "id": "fd02f472-f538-4c4a-95ea-41ed9eceaedc",
+              "name": "request to google",
+              "protocol": "HTTPS",
+              "method": "GET",
+              "uri": "google.ru",
+              "headers": [
+                {
+                  "key": "Host",
+                  "value": "developer.mozilla.org"
+                },
+                {
+                  "key": "User-Agent",
+                  "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
+                },
+                {
+                  "key": "Upgrade-Insecure-Requests",
+                  "value": 1
+                },
+                {
+                  "key": "fake-bool",
+                  "value": true
+                }
+              ],
+              "body": "",
+              "message": ""
+            }
+          ]
+        }
+      },
+      {
+        "COLLECTION": {
+          "id": "c9a46f24-f58a-482d-b8e6-fdc14023cc41",
+          "name": "Collection 2",
+          "description": "Description for Collection 2",
+          "requests": [
+            {
+              "id": "b8750d04-ac86-4edd-ac29-27694e154127",
+              "name": "request to microsoft",
+              "protocol": "HTTPS",
+              "method": "GET",
+              "uri": "microsoft.ru",
+              "headers": [
+                {
+                  "key": "Host",
+                  "value": "developer.mozilla.org"
+                },
+                {
+                  "key": "User-Agent",
+                  "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
+                },
+                {
+                  "key": "Upgrade-Insecure-Requests",
+                  "value": 1
+                },
+                {
+                  "key": "fake-bool",
+                  "value": true
+                }
+              ],
+              "body": "",
+              "message": ""
+            }
+          ]
+        }
+      },
+      {
+        "REQUEST": {
+          "id": "0da1cd93-990e-4ac4-a628-f52645dd5da4",
+          "name": "request to mail",
+          "protocol": "HTTPS",
+          "method": "GET",
+          "uri": "mail.ru",
+          "headers": [
+            {
+              "key": "Host",
+              "value": "developer.mozilla.org"
+            },
+            {
+              "key": "User-Agent",
+              "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
+            },
+            {
+              "key": "Upgrade-Insecure-Requests",
+              "value": 1
+            },
+            {
+              "key": "fake-bool",
+              "value": true
+            }
+          ],
+          "body": "",
+          "message": ""
+        }
+      },
+      {
+        "REQUEST": {
+          "id": "4a37fa1d-dbee-46ed-827a-1d286631d037",
+          "name": "websocket1",
+          "protocol": "WS",
+          "method": "GET",
+          "uri": "10.211.55.3:15555",
+          "headers": [],
+          "body": "",
+          "message": "{\n    \"command\": \"state\"\n}"
         }
       }
     ]

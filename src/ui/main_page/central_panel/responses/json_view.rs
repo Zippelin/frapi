@@ -7,7 +7,7 @@ use egui::{
 use serde_json::Value;
 
 use crate::states::{
-    main_page::{JsonViewType, Response},
+    main_page::response::{JsonViewType, Response},
     Style,
 };
 
@@ -129,7 +129,7 @@ impl JsonView {
                                                         Layout::top_down_justified(Align::LEFT),
                                                         |ui| {
                                                             CollapsingHeader::new(
-                                                                self.label_for_vec_key(&map_key),
+                                                                self.text_for_vec_key(&map_key),
                                                             )
                                                             .default_open(true)
                                                             .id_salt(format!(
@@ -149,7 +149,7 @@ impl JsonView {
                                                         Layout::top_down(Align::LEFT),
                                                         |ui| {
                                                             CollapsingHeader::new(
-                                                                self.label_for_obj_key(&map_key),
+                                                                self.text_for_obj_key(&map_key),
                                                             )
                                                             .default_open(true)
                                                             .id_salt(format!(
@@ -212,9 +212,9 @@ impl JsonView {
                         }
                         Value::Array(inner_items) => {
                             ui.horizontal(|ui| {
-                                ui.add(self.label_for_index(&i));
+                                // ui.add(self.label_for_index(&i));
                                 ui.with_layout(Layout::top_down(Align::LEFT), |ui| {
-                                    CollapsingHeader::new(self.label_for_vec_key(&"[".into()))
+                                    CollapsingHeader::new(self.text_for_index_as_vec(&i))
                                         .default_open(true)
                                         .id_salt(format!("{:#?}", items[i]))
                                         .show(ui, |ui| {
@@ -227,9 +227,9 @@ impl JsonView {
                         }
                         Value::Object(_) => {
                             ui.horizontal(|ui| {
-                                ui.add(self.label_for_index(&i));
+                                // ui.add(self.label_for_index(&i));
                                 ui.with_layout(Layout::top_down(Align::LEFT), |ui| {
-                                    CollapsingHeader::new(self.label_for_obj_key(&"[".into()))
+                                    CollapsingHeader::new(self.text_for_index_as_object(&i))
                                         .default_open(true)
                                         .id_salt(format!("{:#?}", items[i]))
                                         .show(ui, |ui| {
@@ -274,7 +274,7 @@ impl JsonView {
                         }
                         Value::Array(inner_items) => {
                             ui.with_layout(Layout::top_down(Align::LEFT), |ui| {
-                                CollapsingHeader::new(self.label_for_obj_key(&field_key))
+                                CollapsingHeader::new(self.text_for_obj_key(&field_key))
                                     .default_open(true)
                                     .id_salt(format!("{:#?}-{:#?}", &field_key, &field_value))
                                     .show(ui, |ui| {
@@ -286,7 +286,7 @@ impl JsonView {
                         }
                         Value::Object(_) => {
                             ui.with_layout(Layout::top_down(Align::LEFT), |ui| {
-                                CollapsingHeader::new(self.label_for_obj_key(&field_key))
+                                CollapsingHeader::new(self.text_for_obj_key(&field_key))
                                     .default_open(true)
                                     .id_salt(format!("{:#?}-{:#?}", &field_key, &field_value))
                                     .show(ui, |ui| {
@@ -368,6 +368,21 @@ impl JsonView {
     }
 
     fn label_for_index(&self, index: &usize) -> Label {
+        let mut job = self.text_for_index(index);
+
+        job.append(
+            ":",
+            0.0,
+            TextFormat {
+                color: Color32::LIGHT_YELLOW,
+                font_id: FontId::new(11.0, FontFamily::Proportional),
+                ..Default::default()
+            },
+        );
+        Label::new(WidgetText::LayoutJob(Arc::new(job)))
+    }
+
+    fn text_for_index(&self, index: &usize) -> LayoutJob {
         let mut job = LayoutJob::default();
 
         job.append(
@@ -379,17 +394,59 @@ impl JsonView {
                 ..Default::default()
             },
         );
+
+        job
+    }
+
+    fn text_for_index_as_object(&self, index: &usize) -> WidgetText {
+        let mut job = self.text_for_index(index);
+
         job.append(
             ":",
             0.0,
             TextFormat {
-                color: Color32::LIGHT_YELLOW,
+                color: Color32::LIGHT_GREEN,
+                font_id: FontId::new(12.0, FontFamily::Proportional),
+                ..Default::default()
+            },
+        );
+
+        job.append(
+            "[object]",
+            15.0,
+            TextFormat {
+                color: Color32::LIGHT_GRAY,
+                font_id: FontId::new(11.0, FontFamily::Proportional),
+                ..Default::default()
+            },
+        );
+        WidgetText::LayoutJob(Arc::new(job))
+    }
+
+    fn text_for_index_as_vec(&self, index: &usize) -> WidgetText {
+        let mut job = self.text_for_index(index);
+
+        job.append(
+            ":",
+            0.0,
+            TextFormat {
+                color: Color32::LIGHT_GREEN,
+                font_id: FontId::new(12.0, FontFamily::Proportional),
+                ..Default::default()
+            },
+        );
+
+        job.append(
+            "[array]",
+            15.0,
+            TextFormat {
+                color: Color32::LIGHT_GRAY,
                 font_id: FontId::new(11.0, FontFamily::Proportional),
                 ..Default::default()
             },
         );
 
-        Label::new(WidgetText::LayoutJob(Arc::new(job)))
+        WidgetText::LayoutJob(Arc::new(job))
     }
 
     fn label_for_key(&self, text: &String) -> Label {
@@ -433,44 +490,47 @@ impl JsonView {
         Label::new(WidgetText::LayoutJob(Arc::new(job)))
     }
 
-    fn label_for_obj_key(&self, text: &String) -> WidgetText {
+    fn text_for_obj_key(&self, text: &String) -> WidgetText {
         let mut job = LayoutJob::default();
-        job.append(
-            "\"",
-            0.0,
-            TextFormat {
-                color: Color32::LIGHT_BLUE,
-                font_id: FontId::new(12.0, FontFamily::Proportional),
-                ..Default::default()
-            },
-        );
-        job.append(
-            &text,
-            0.0,
-            TextFormat {
-                color: Color32::ORANGE,
-                font_id: FontId::new(12.0, FontFamily::Proportional),
-                ..Default::default()
-            },
-        );
-        job.append(
-            "\"",
-            0.0,
-            TextFormat {
-                color: Color32::LIGHT_BLUE,
-                font_id: FontId::new(12.0, FontFamily::Proportional),
-                ..Default::default()
-            },
-        );
-        job.append(
-            ":",
-            0.0,
-            TextFormat {
-                color: Color32::LIGHT_GREEN,
-                font_id: FontId::new(12.0, FontFamily::Proportional),
-                ..Default::default()
-            },
-        );
+
+        if text.len() > 0 {
+            job.append(
+                "\"",
+                0.0,
+                TextFormat {
+                    color: Color32::LIGHT_BLUE,
+                    font_id: FontId::new(12.0, FontFamily::Proportional),
+                    ..Default::default()
+                },
+            );
+            job.append(
+                &text,
+                0.0,
+                TextFormat {
+                    color: Color32::ORANGE,
+                    font_id: FontId::new(12.0, FontFamily::Proportional),
+                    ..Default::default()
+                },
+            );
+            job.append(
+                "\"",
+                0.0,
+                TextFormat {
+                    color: Color32::LIGHT_BLUE,
+                    font_id: FontId::new(12.0, FontFamily::Proportional),
+                    ..Default::default()
+                },
+            );
+            job.append(
+                ":",
+                0.0,
+                TextFormat {
+                    color: Color32::LIGHT_GREEN,
+                    font_id: FontId::new(12.0, FontFamily::Proportional),
+                    ..Default::default()
+                },
+            );
+        };
 
         job.append(
             "[object]",
@@ -485,7 +545,7 @@ impl JsonView {
         WidgetText::LayoutJob(Arc::new(job))
     }
 
-    fn label_for_vec_key(&self, text: &String) -> WidgetText {
+    fn text_for_vec_key(&self, text: &String) -> WidgetText {
         let mut job = LayoutJob::default();
         job.append(
             "\"",

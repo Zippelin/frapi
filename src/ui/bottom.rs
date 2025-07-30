@@ -18,7 +18,7 @@ impl BottomPanel {
             )
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    ui.add_space(ui.available_width() - 300.);
+                    ui.add_space(ui.available_width() - 400.);
 
                     ui.add(Label::new("Items: ").selectable(false));
                     ui.add(

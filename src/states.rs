@@ -9,7 +9,7 @@ use egui::Color32;
 
 use crate::{
     settings::{Options as SettingsOptions, Settings, UISettings, UITheme},
-    states::main_page::{Entity, MainPage},
+    states::main_page::{entity::Entity, MainPage},
     ui::{colors::ThemeColors, fonts::Fonts},
 };
 
@@ -69,7 +69,6 @@ impl States {
         let settings = match Settings::dyn_load(file_path) {
             Ok(val) => val,
             Err(err) => {
-                println!("{}", err);
                 self.event_error(&err);
                 return;
             }
@@ -257,7 +256,7 @@ pub struct Options {}
 impl From<&SettingsOptions> for Options {
     fn from(value: &SettingsOptions) -> Self {
         let _ = value;
-        // TODO: make convertion from settigns options to state options
+        // TODO: make convertion from settings options to state options
         Self {}
     }
 }

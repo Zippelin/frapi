@@ -8,7 +8,7 @@ use egui::{
 
 use crate::{
     settings::{Method, Protocol},
-    states::{main_page::Entity, States, Style},
+    states::{main_page::entity::Entity, States, Style},
     ui::icons::Icon,
 };
 
@@ -231,7 +231,6 @@ impl VisualEntity {
                     .selected_entity
                     .request_is_selected(None, entity_idx);
 
-                // TODO: add deletion of requests
                 let (request_btn_resp, request_delete_resp) = self.update_request_entity(
                     ui,
                     &request.draft.name,
@@ -266,7 +265,7 @@ impl VisualEntity {
     }
 
     /// Draw request  item
-    /// Return tuplet: (folder_tbn, delete_btn) of responses
+    /// Return tuplet: (folder_btn, delete_btn) of responses
     fn update_request_entity(
         &self,
         ui: &mut Ui,
@@ -300,11 +299,12 @@ impl VisualEntity {
                     .inner_margin(Margin::symmetric(5, 9))
                     .fill(style.color_light())
                     .show(ui, |ui| {
-                        ui.add(
+                        ui.add_sized(
+                            vec2(20., ui.available_height()),
                             Label::new(request_details_text)
                                 .selectable(false)
                                 .halign(Align::RIGHT),
-                        );
+                        )
                     });
 
                 // Separate layout so inner text could align left
