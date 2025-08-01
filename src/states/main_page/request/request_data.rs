@@ -16,6 +16,8 @@ pub struct RequestData {
     /// List og qeury params.
     /// Constructed on fly, dont store in settings
     pub query_params: Vec<Header>,
+    /// Path to binary file
+    pub binary_path: String,
 }
 
 /// From Settigns -> State
@@ -56,6 +58,7 @@ impl From<&RequestSettings> for RequestData {
             body,
             query_params: vec![],
             message,
+            binary_path: value.binary_path.clone(),
         };
         data.parse_query_params();
         data
@@ -73,6 +76,7 @@ impl RequestData {
             body: CountedText::default(),
             query_params: vec![],
             message: CountedText::default(),
+            binary_path: "".into(),
         }
     }
     /// Copy from other Self.

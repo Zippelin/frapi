@@ -363,6 +363,7 @@ pub struct RequestSettings {
     pub body: String,
     pub message: String,
     pub setup: RequestSetupSettings,
+    pub binary_path: String,
 }
 
 impl From<&StateRequest> for RequestSettings {
@@ -383,6 +384,7 @@ impl From<&StateRequest> for RequestSettings {
             body: value.draft.body.message.clone(),
             message: value.draft.message.message.clone(),
             setup: RequestSetupSettings::from(&value.setup),
+            binary_path: value.draft.binary_path.clone(),
         }
     }
 }
@@ -405,6 +407,7 @@ impl RequestSettings {
             body: value.original.body.message.clone(),
             message: value.original.message.message.clone(),
             setup: RequestSetupSettings::from(&value.setup),
+            binary_path: value.original.binary_path.clone(),
         }
     }
 }
@@ -487,6 +490,7 @@ impl From<&StateHeader> for Header {
     }
 }
 
+/// Generate chache based on currend model
 #[cfg(test)]
 mod tests {
     use std::{
@@ -502,10 +506,10 @@ mod tests {
             theme: UITheme::Dark,
         };
 
-        let header_1 = Header {
-            key: "Host".into(),
-            value: "developer.mozilla.org".into(),
-        };
+        // let header_1 = Header {
+        //     key: "Host".into(),
+        //     value: "developer.mozilla.org".into(),
+        // };
 
         let header_2 = Header {
             key: "User-Agent".into(),
@@ -531,7 +535,7 @@ mod tests {
             uri: "vue-backend-mocker-default-rtdb.europe-west1.firebasedatabase.app/surveys.json"
                 .into(),
             headers: vec![
-                header_1.clone(),
+                // header_1.clone(),
                 header_2.clone(),
                 header_3.clone(),
                 header_4.clone(),
@@ -539,6 +543,7 @@ mod tests {
             body: "".into(),
             message: "".into(),
             setup: RequestSetupSettings::http(),
+            binary_path: "".into(),
         };
 
         let request_1 = RequestSettings {
@@ -548,7 +553,7 @@ mod tests {
             method: Method::GET,
             uri: "ya.ru".into(),
             headers: vec![
-                header_1.clone(),
+                // header_1.clone(),
                 header_2.clone(),
                 header_3.clone(),
                 header_4.clone(),
@@ -556,6 +561,7 @@ mod tests {
             body: "".into(),
             message: "".into(),
             setup: RequestSetupSettings::http(),
+            binary_path: "".into(),
         };
 
         let request_2 = RequestSettings {
@@ -565,7 +571,7 @@ mod tests {
             method: Method::GET,
             uri: "google.ru".into(),
             headers: vec![
-                header_1.clone(),
+                // header_1.clone(),
                 header_2.clone(),
                 header_3.clone(),
                 header_4.clone(),
@@ -573,6 +579,7 @@ mod tests {
             body: "".into(),
             message: "".into(),
             setup: RequestSetupSettings::http(),
+            binary_path: "".into(),
         };
 
         let collection_1 = CollectionSettings {
@@ -589,7 +596,7 @@ mod tests {
             method: Method::GET,
             uri: "microsoft.ru".into(),
             headers: vec![
-                header_1.clone(),
+                // header_1.clone(),
                 header_2.clone(),
                 header_3.clone(),
                 header_4.clone(),
@@ -597,6 +604,7 @@ mod tests {
             body: "".into(),
             message: "".into(),
             setup: RequestSetupSettings::http(),
+            binary_path: "".into(),
         };
 
         let collection_2 = CollectionSettings {
@@ -613,7 +621,7 @@ mod tests {
             method: Method::GET,
             uri: "mail.ru".into(),
             headers: vec![
-                header_1.clone(),
+                // header_1.clone(),
                 header_2.clone(),
                 header_3.clone(),
                 header_4.clone(),
@@ -621,6 +629,7 @@ mod tests {
             body: "".into(),
             message: "".into(),
             setup: RequestSetupSettings::http(),
+            binary_path: "".into(),
         };
 
         let main_page = MainPageSettings {

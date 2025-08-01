@@ -139,6 +139,7 @@ pub struct CommandExecute {
     pub headers: Vec<Header>,
     pub body: String,
     pub message: String,
+    pub binary_path: String,
 }
 
 /// From RequestData -> command to execute on executor
@@ -159,6 +160,7 @@ impl From<&RequestData> for CommandExecute {
             headers,
             body: value.body.message.clone(),
             message: value.message.message.clone(),
+            binary_path: value.binary_path.clone(),
         }
     }
 }
@@ -329,6 +331,8 @@ impl Executor {
                         builder = builder.redirect(Policy::limited(
                             setup.redirects_amount.parse::<usize>().unwrap(),
                         ));
+                    } else {
+                        builder = builder.redirect(Policy::none());
                     }
 
                     match setup.http_version {
@@ -346,6 +350,12 @@ impl Executor {
                     for header in command_execute.headers {
                         result = result.header(header.key, header.value);
                     }
+
+                    if command_execute.body.len() > 0 {
+                        result = result.body(command_execute.body);
+                    }
+
+                    if command_execute.binary_path.len() > 0 {}
 
                     let result = result.send().await;
 

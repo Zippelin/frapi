@@ -51,6 +51,7 @@ impl ResponsesListPanel {
 
                 let mut responses = responses.unwrap();
 
+                // TODO: add clear all responses
                 ui.with_layout(Layout::top_down_justified(Align::LEFT), |ui| {
                     ScrollArea::vertical()
                         .max_height(ui.available_height() - 10.)
@@ -120,7 +121,6 @@ impl ResponsesListPanel {
                         .background_color(style.color_light()),
                 );
             }
-            // TODO: add headers of response
             ResponseView::HEADERS => {
                 Frame::new()
                     .inner_margin(Margin::same(5))
@@ -132,18 +132,22 @@ impl ResponsesListPanel {
                             .min_col_width(100.)
                             .striped(true)
                             .show(ui, |ui| {
-                                ui.add(Label::new("URL").wrap_mode(TextWrapMode::Wrap));
+                                if response.data.redictection_url.len() > 0 {
+                                    ui.add(
+                                        Label::new("Redirect URL").wrap_mode(TextWrapMode::Wrap),
+                                    );
 
-                                ui.add(
-                                    Label::new(WidgetText::RichText(Arc::new(
-                                        RichText::new(response.data.redictection_url.clone())
-                                            .font(style.fonts.label_strong())
-                                            .strong(),
-                                    )))
-                                    .wrap_mode(TextWrapMode::Wrap),
-                                );
+                                    ui.add(
+                                        Label::new(WidgetText::RichText(Arc::new(
+                                            RichText::new(response.data.redictection_url.clone())
+                                                .font(style.fonts.label_strong())
+                                                .strong(),
+                                        )))
+                                        .wrap_mode(TextWrapMode::Wrap),
+                                    );
 
-                                ui.end_row();
+                                    ui.end_row();
+                                }
 
                                 for header in &response.data.headers {
                                     ui.add(

@@ -4,6 +4,7 @@ use egui::{
     vec2, Align, Button, ComboBox, CornerRadius, FontFamily, FontId, FontSelection, Frame, Label,
     Layout, Margin, RichText, ScrollArea, Separator, TextEdit, TopBottomPanel, Ui, WidgetText,
 };
+use rfd::FileDialog;
 
 use crate::{
     settings::{Method, Protocol},
@@ -78,6 +79,11 @@ impl RequestDetailsPanel {
 
                     if request.draft.protocot_is_http() {
                         ui.radio_value(&mut request.visible_details, RequestDetails::Body, "Body");
+                        ui.radio_value(
+                            &mut request.visible_details,
+                            RequestDetails::Binary,
+                            "Binary",
+                        );
                     }
 
                     ui.radio_value(&mut request.visible_details, RequestDetails::Setup, "Setup");
@@ -87,8 +93,6 @@ impl RequestDetailsPanel {
 
                 ui.add_space(10.);
 
-                // TODO: add binary to send
-
                 // Select view of request part
                 let request = states.main_page.selected_request().unwrap();
                 match request.visible_details {
@@ -96,8 +100,30 @@ impl RequestDetailsPanel {
                     RequestDetails::Body => self.update_body(ui, states),
                     RequestDetails::QueryParams => self.update_query_params(ui, states),
                     RequestDetails::Message => self.update_message(ui, states),
+                    RequestDetails::Binary => self.update_binary(ui, states),
                     RequestDetails::Setup => self.update_setup(ui, states),
                 };
+            })
+        });
+    }
+    /// Draw binary file select
+    fn update_binary(&self, ui: &mut Ui, states: &mut States) {
+        ui.horizontal(|ui| {
+            ui.group(|ui| {
+                let request = states.main_page.selected_request_mut().unwrap();
+
+                ui.add(
+                    TextEdit::singleline(&mut request.draft.binary_path)
+                        .desired_width(ui.available_width() - 65.),
+                );
+
+                if ui.add(Button::new("Browse")).clicked() {
+                    let file = FileDialog::new().set_directory("./").pick_file();
+                    if let Some(file_path) = file {
+                        request.draft.binary_path = file_path.to_string_lossy().to_string();
+                        request.is_changed = true;
+                    }
+                }
             })
         });
     }

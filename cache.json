@@ -6,17 +6,13 @@
     "entities": [
       {
         "REQUEST": {
-          "id": "b512555a-492d-4197-95be-5b87b87b51c2",
+          "id": "559b088d-4a7a-481e-8b59-229c7ee864b3",
           "name": "request to firebase",
           "protocol": "HTTPS",
           "method": "GET",
           "uri": "vue-backend-mocker-default-rtdb.europe-west1.firebasedatabase.app/surveys.json",
           "headers": [
             {
-              "key": "Host",
-              "value": "developer.mozilla.org"
-            },
-            {
               "key": "User-Agent",
               "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
             },
@@ -38,27 +34,24 @@
               "use_redicrects": true,
               "redirects_amount": 9
             }
-          }
+          },
+          "binary_path": ""
         }
       },
       {
         "COLLECTION": {
-          "id": "38bad8ac-9fb5-4e90-a300-c54d06c27d07",
+          "id": "55896a81-da30-49ae-bcee-b3409e25e45d",
           "name": "Collection 1",
           "description": "Description for Collection 1",
           "requests": [
             {
-              "id": "950e4419-313f-4822-bd11-b176817acd84",
+              "id": "a8a962da-ef73-4c6b-a853-0cc0ec962adc",
               "name": "request to yandex",
               "protocol": "HTTPS",
               "method": "GET",
               "uri": "ya.ru",
               "headers": [
                 {
-                  "key": "Host",
-                  "value": "developer.mozilla.org"
-                },
-                {
                   "key": "User-Agent",
                   "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
                 },
@@ -80,20 +73,17 @@
                   "use_redicrects": true,
                   "redirects_amount": 9
                 }
-              }
+              },
+              "binary_path": ""
             },
             {
-              "id": "4d92fa6e-f4d3-4bc3-978e-91a454897449",
+              "id": "423fecb4-f3c8-45f1-ae60-e853a4b5c21e",
               "name": "request to google",
               "protocol": "HTTPS",
               "method": "GET",
               "uri": "google.ru",
               "headers": [
                 {
-                  "key": "Host",
-                  "value": "developer.mozilla.org"
-                },
-                {
                   "key": "User-Agent",
                   "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
                 },
@@ -115,28 +105,25 @@
                   "use_redicrects": true,
                   "redirects_amount": 9
                 }
-              }
+              },
+              "binary_path": ""
             }
           ]
         }
       },
       {
         "COLLECTION": {
-          "id": "0ece628d-9864-4903-ada9-8f8a03c10815",
+          "id": "0036889d-970c-43c7-8d4f-20155e640004",
           "name": "Collection 2",
           "description": "Description for Collection 2",
           "requests": [
             {
-              "id": "1fee9b53-9884-4de2-ad2e-fb41c2b0d11a",
+              "id": "81253886-5b0d-41fb-a170-72051748d5b7",
               "name": "request to microsoft",
               "protocol": "HTTPS",
               "method": "GET",
               "uri": "microsoft.ru",
               "headers": [
-                {
-                  "key": "Host",
-                  "value": "developer.mozilla.org"
-                },
                 {
                   "key": "User-Agent",
                   "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
@@ -159,23 +146,20 @@
                   "use_redicrects": true,
                   "redirects_amount": 9
                 }
-              }
+              },
+              "binary_path": ""
             }
           ]
         }
       },
       {
         "REQUEST": {
-          "id": "d91999ce-939f-4549-87c0-1ee1a26a91f1",
+          "id": "808875f3-34a6-4221-8930-1430b9aa0ea0",
           "name": "request to mail",
           "protocol": "HTTPS",
           "method": "GET",
           "uri": "mail.ru",
           "headers": [
-            {
-              "key": "Host",
-              "value": "developer.mozilla.org"
-            },
             {
               "key": "User-Agent",
               "value": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:50.0) Gecko/20100101 Firefox/50.0"
@@ -198,7 +182,8 @@
               "use_redicrects": true,
               "redirects_amount": 9
             }
-          }
+          },
+          "binary_path": ""
         }
       }
     ]

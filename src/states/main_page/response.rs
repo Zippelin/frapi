@@ -48,7 +48,7 @@ impl Response {
     /// Used as answear from HTTP or HTTPS
     pub async fn from_http_response(http_response: HttpResponse) -> Result<Self, (Self, String)> {
         match http_response.error_for_status() {
-            Ok(mut result) => {
+            Ok(result) => {
                 let mut headers = vec![];
 
                 for header in result.headers() {
@@ -61,22 +61,14 @@ impl Response {
                 let code = result.status().as_u16() as usize;
                 let redirect_url = result.url().to_string();
 
-                while let Ok(Some(chunk)) = result.chunk().await {
-                    println!("Chunk: {chunk:?}");
-                }
-
                 match result.text().await {
-                    Ok(text) => {
-                        println!("text: {}", text);
-
-                        Ok(Self {
-                            time: Local::now(),
-                            data: ResponseData::new(text, headers, redirect_url),
-                            selected_view: ResponseView::RAW,
-                            code,
-                            is_folded: true,
-                        })
-                    }
+                    Ok(text) => Ok(Self {
+                        time: Local::now(),
+                        data: ResponseData::new(text, headers, redirect_url),
+                        selected_view: ResponseView::RAW,
+                        code,
+                        is_folded: true,
+                    }),
                     Err(err) => {
                         println!("err: {}", err);
                         Err((

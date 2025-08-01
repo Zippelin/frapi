@@ -205,6 +205,7 @@ pub enum RequestDetails {
     QueryParams,
     Message,
     Setup,
+    Binary,
 }
 
 /// Request details currently shown on UI
