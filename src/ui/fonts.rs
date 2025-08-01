@@ -9,6 +9,7 @@ pub struct Fonts {
     small_textedit: FontId,
     header1: FontId,
     header2: FontId,
+    label_strong: FontId,
 }
 // TODO: Add this fonts support across application
 /// Fonts settings for application
@@ -20,6 +21,14 @@ impl Fonts {
             small_textedit: Self::fontid_textedit_small(),
             header1: Self::fontid_header1(),
             header2: Self::fontid_header2(),
+            label_strong: Self::fontid_label_strong(),
+        }
+    }
+
+    fn fontid_label_strong() -> FontId {
+        FontId {
+            size: 12.,
+            family: FontFamily::Monospace,
         }
     }
 
@@ -66,5 +75,9 @@ impl Fonts {
 
     pub fn header2(&self) -> FontId {
         self.header2.clone()
+    }
+
+    pub fn label_strong(&self) -> FontId {
+        self.label_strong.clone()
     }
 }

@@ -6,7 +6,7 @@
     "entities": [
       {
         "REQUEST": {
-          "id": "a50bd844-7b9b-45df-81f6-0010d8f9c82d",
+          "id": "b512555a-492d-4197-95be-5b87b87b51c2",
           "name": "request to firebase",
           "protocol": "HTTPS",
           "method": "GET",
@@ -30,17 +30,25 @@
             }
           ],
           "body": "",
-          "message": ""
+          "message": "",
+          "setup": {
+            "HTTP": {
+              "http_version": "AUTO",
+              "use_cookies": true,
+              "use_redicrects": true,
+              "redirects_amount": 9
+            }
+          }
         }
       },
       {
         "COLLECTION": {
-          "id": "401982d3-8688-457f-9200-b4e333904e24",
+          "id": "38bad8ac-9fb5-4e90-a300-c54d06c27d07",
           "name": "Collection 1",
           "description": "Description for Collection 1",
           "requests": [
             {
-              "id": "5253db81-f76e-4287-b034-cd5472884f4c",
+              "id": "950e4419-313f-4822-bd11-b176817acd84",
               "name": "request to yandex",
               "protocol": "HTTPS",
               "method": "GET",
@@ -64,10 +72,18 @@
                 }
               ],
               "body": "",
-              "message": ""
+              "message": "",
+              "setup": {
+                "HTTP": {
+                  "http_version": "AUTO",
+                  "use_cookies": true,
+                  "use_redicrects": true,
+                  "redirects_amount": 9
+                }
+              }
             },
             {
-              "id": "fd02f472-f538-4c4a-95ea-41ed9eceaedc",
+              "id": "4d92fa6e-f4d3-4bc3-978e-91a454897449",
               "name": "request to google",
               "protocol": "HTTPS",
               "method": "GET",
@@ -91,19 +107,27 @@
                 }
               ],
               "body": "",
-              "message": ""
+              "message": "",
+              "setup": {
+                "HTTP": {
+                  "http_version": "AUTO",
+                  "use_cookies": true,
+                  "use_redicrects": true,
+                  "redirects_amount": 9
+                }
+              }
             }
           ]
         }
       },
       {
         "COLLECTION": {
-          "id": "c9a46f24-f58a-482d-b8e6-fdc14023cc41",
+          "id": "0ece628d-9864-4903-ada9-8f8a03c10815",
           "name": "Collection 2",
           "description": "Description for Collection 2",
           "requests": [
             {
-              "id": "b8750d04-ac86-4edd-ac29-27694e154127",
+              "id": "1fee9b53-9884-4de2-ad2e-fb41c2b0d11a",
               "name": "request to microsoft",
               "protocol": "HTTPS",
               "method": "GET",
@@ -127,14 +151,22 @@
                 }
               ],
               "body": "",
-              "message": ""
+              "message": "",
+              "setup": {
+                "HTTP": {
+                  "http_version": "AUTO",
+                  "use_cookies": true,
+                  "use_redicrects": true,
+                  "redirects_amount": 9
+                }
+              }
             }
           ]
         }
       },
       {
         "REQUEST": {
-          "id": "0da1cd93-990e-4ac4-a628-f52645dd5da4",
+          "id": "d91999ce-939f-4549-87c0-1ee1a26a91f1",
           "name": "request to mail",
           "protocol": "HTTPS",
           "method": "GET",
@@ -158,19 +190,15 @@
             }
           ],
           "body": "",
-          "message": ""
-        }
-      },
-      {
-        "REQUEST": {
-          "id": "4a37fa1d-dbee-46ed-827a-1d286631d037",
-          "name": "websocket1",
-          "protocol": "WS",
-          "method": "GET",
-          "uri": "10.211.55.3:15555",
-          "headers": [],
-          "body": "",
-          "message": "{\n    \"command\": \"state\"\n}"
+          "message": "",
+          "setup": {
+            "HTTP": {
+              "http_version": "AUTO",
+              "use_cookies": true,
+              "use_redicrects": true,
+              "redirects_amount": 9
+            }
+          }
         }
       }
     ]

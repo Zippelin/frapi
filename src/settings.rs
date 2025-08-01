@@ -10,8 +10,13 @@ use serde_json::Value;
 
 use crate::states::{
     main_page::{
-        collection::Collection as StateCollection, entity::Entity as StateEntity,
-        generics::Header as StateHeader, request::Request as StateRequest, MainPage,
+        collection::Collection as StateCollection,
+        entity::Entity as StateEntity,
+        generics::Header as StateHeader,
+        request::{
+            HttpVersion, Request as StateRequest, RequestHttpSetup, RequestSetup, RequestWsSetup,
+        },
+        MainPage,
     },
     Options as StateOptions, States, Style, Theme,
 };
@@ -357,6 +362,7 @@ pub struct RequestSettings {
     pub headers: Vec<Header>,
     pub body: String,
     pub message: String,
+    pub setup: RequestSetupSettings,
 }
 
 impl From<&StateRequest> for RequestSettings {
@@ -376,6 +382,7 @@ impl From<&StateRequest> for RequestSettings {
             headers,
             body: value.draft.body.message.clone(),
             message: value.draft.message.message.clone(),
+            setup: RequestSetupSettings::from(&value.setup),
         }
     }
 }
@@ -397,6 +404,7 @@ impl RequestSettings {
             headers,
             body: value.original.body.message.clone(),
             message: value.original.message.message.clone(),
+            setup: RequestSetupSettings::from(&value.setup),
         }
     }
 }
@@ -530,6 +538,7 @@ mod tests {
             ],
             body: "".into(),
             message: "".into(),
+            setup: RequestSetupSettings::http(),
         };
 
         let request_1 = RequestSettings {
@@ -546,6 +555,7 @@ mod tests {
             ],
             body: "".into(),
             message: "".into(),
+            setup: RequestSetupSettings::http(),
         };
 
         let request_2 = RequestSettings {
@@ -562,6 +572,7 @@ mod tests {
             ],
             body: "".into(),
             message: "".into(),
+            setup: RequestSetupSettings::http(),
         };
 
         let collection_1 = CollectionSettings {
@@ -585,6 +596,7 @@ mod tests {
             ],
             body: "".into(),
             message: "".into(),
+            setup: RequestSetupSettings::http(),
         };
 
         let collection_2 = CollectionSettings {
@@ -608,6 +620,7 @@ mod tests {
             ],
             body: "".into(),
             message: "".into(),
+            setup: RequestSetupSettings::http(),
         };
 
         let main_page = MainPageSettings {
@@ -642,5 +655,109 @@ mod tests {
         let mut buffer = BufWriter::new(&file);
         let _ = buffer.write_all(json.as_bytes());
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub enum HttpVersionSetting {
+    #[default]
+    AUTO,
+    HTTPv1,
+    HTTPv2,
+}
+
+/// Settings to make reqeust
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum RequestSetupSettings {
+    HTTP(RequestHttpSetupSettings),
+    WS(RequestWsSetupSettings),
+}
+
+impl Default for RequestSetupSettings {
+    fn default() -> Self {
+        Self::HTTP(RequestHttpSetupSettings::default())
+    }
+}
+
+impl From<&RequestSetup> for RequestSetupSettings {
+    fn from(value: &RequestSetup) -> Self {
+        match value {
+            RequestSetup::HTTP(request_http_setup) => {
+                Self::HTTP(RequestHttpSetupSettings::from(request_http_setup))
+            }
+            RequestSetup::WS(request_ws_setup) => {
+                Self::WS(RequestWsSetupSettings::from(request_ws_setup))
+            }
+        }
+    }
+}
+
+impl RequestSetupSettings {
+    pub fn http() -> Self {
+        Self::HTTP(RequestHttpSetupSettings::default())
+    }
+    pub fn ws() -> Self {
+        Self::WS(RequestWsSetupSettings::default())
+    }
+}
+
+/// Settings to make http reqeust
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct RequestHttpSetupSettings {
+    pub http_version: HttpVersionSetting,
+    pub use_cookies: bool,
+    pub use_redicrects: bool,
+    pub redirects_amount: usize,
+}
+
+impl Default for RequestHttpSetupSettings {
+    fn default() -> Self {
+        Self {
+            http_version: HttpVersionSetting::AUTO,
+            use_cookies: true,
+            use_redicrects: true,
+            redirects_amount: 9,
+        }
+    }
+}
+
+impl From<&RequestHttpSetup> for RequestHttpSetupSettings {
+    fn from(value: &RequestHttpSetup) -> Self {
+        let http_version = match value.http_version {
+            HttpVersion::HTTPv1 => HttpVersionSetting::HTTPv1,
+            HttpVersion::HTTPv2 => HttpVersionSetting::HTTPv2,
+            HttpVersion::AUTO => HttpVersionSetting::AUTO,
+        };
+        Self {
+            http_version,
+            use_cookies: value.use_cookies,
+            use_redicrects: value.use_redicrects,
+            redirects_amount: value.redirects_amount.parse::<usize>().unwrap(),
+        }
+    }
+}
+
+/// Settings to make ws reqeust
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct RequestWsSetupSettings {
+    pub reconnection_timeout: usize,
+    pub reconnection_attempts: usize,
+}
+
+impl Default for RequestWsSetupSettings {
+    fn default() -> Self {
+        Self {
+            reconnection_timeout: 5000,
+            reconnection_attempts: 3,
+        }
+    }
+}
+
+impl From<&RequestWsSetup> for RequestWsSetupSettings {
+    fn from(value: &RequestWsSetup) -> Self {
+        Self {
+            reconnection_timeout: value.reconnection_timeout.parse::<usize>().unwrap(),
+            reconnection_attempts: value.reconnection_attempts.parse::<usize>().unwrap(),
+        }
     }
 }

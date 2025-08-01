@@ -508,7 +508,7 @@ impl MainPage {
         }
     }
 
-    pub fn get_reqeust_mut(&mut self, idx: usize) -> Option<&mut Request> {
+    pub fn get_request_mut(&mut self, idx: usize) -> Option<&mut Request> {
         let entity = match self.entities.get_mut(idx) {
             Some(val) => val,
             None => return None,

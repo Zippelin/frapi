@@ -28,7 +28,7 @@ impl Response {
     pub fn from_utf8_bytes(data: Utf8Bytes) -> Self {
         Self {
             time: Local::now(),
-            data: ResponseData::new(data.to_string(), vec![]),
+            data: ResponseData::new(data.to_string(), vec![], "".into()),
             selected_view: ResponseView::RAW,
             code: 0,
             is_folded: true,
@@ -38,7 +38,7 @@ impl Response {
     pub fn closed_connection() -> Self {
         Self {
             time: Local::now(),
-            data: ResponseData::new("Connection closed".into(), vec![]),
+            data: ResponseData::new("Connection closed".into(), vec![], "".into()),
             selected_view: ResponseView::RAW,
             code: 0,
             is_folded: true,
@@ -48,7 +48,7 @@ impl Response {
     /// Used as answear from HTTP or HTTPS
     pub async fn from_http_response(http_response: HttpResponse) -> Result<Self, (Self, String)> {
         match http_response.error_for_status() {
-            Ok(result) => {
+            Ok(mut result) => {
                 let mut headers = vec![];
 
                 for header in result.headers() {
@@ -59,25 +59,41 @@ impl Response {
                 }
 
                 let code = result.status().as_u16() as usize;
+                let redirect_url = result.url().to_string();
+
+                while let Ok(Some(chunk)) = result.chunk().await {
+                    println!("Chunk: {chunk:?}");
+                }
 
                 match result.text().await {
-                    Ok(text) => Ok(Self {
-                        time: Local::now(),
-                        data: ResponseData::new(text, vec![]),
-                        selected_view: ResponseView::RAW,
-                        code,
-                        is_folded: true,
-                    }),
-                    Err(err) => Err((
-                        Self {
+                    Ok(text) => {
+                        println!("text: {}", text);
+
+                        Ok(Self {
                             time: Local::now(),
-                            data: ResponseData::new("Error during text receiving".into(), vec![]),
+                            data: ResponseData::new(text, headers, redirect_url),
                             selected_view: ResponseView::RAW,
                             code,
                             is_folded: true,
-                        },
-                        format!("Error during text receiving. Error: {}", err),
-                    )),
+                        })
+                    }
+                    Err(err) => {
+                        println!("err: {}", err);
+                        Err((
+                            Self {
+                                time: Local::now(),
+                                data: ResponseData::new(
+                                    "Error during text receiving".into(),
+                                    vec![],
+                                    "".into(),
+                                ),
+                                selected_view: ResponseView::RAW,
+                                code,
+                                is_folded: true,
+                            },
+                            format!("Error during text receiving. Error: {}", err),
+                        ))
+                    }
                 }
             }
 
@@ -85,7 +101,7 @@ impl Response {
                 Some(err_status_code) => match err_status_code.canonical_reason() {
                     Some(err_reason) => Ok(Self {
                         time: Local::now(),
-                        data: ResponseData::new(err_reason.into(), vec![]),
+                        data: ResponseData::new(err_reason.into(), vec![], "".into()),
                         selected_view: ResponseView::RAW,
                         code: err.status().unwrap().as_u16() as usize,
                         is_folded: true,
@@ -96,6 +112,7 @@ impl Response {
                             data: ResponseData::new(
                                 "Error during text receiving for error reason".into(),
                                 vec![],
+                                "".into(),
                             ),
                             selected_view: ResponseView::RAW,
                             code: err.status().unwrap().as_u16() as usize,
@@ -110,6 +127,7 @@ impl Response {
                         data: ResponseData::new(
                             "Error during status code receiving".into(),
                             vec![],
+                            "".into(),
                         ),
                         selected_view: ResponseView::RAW,
                         code: err.status().unwrap().as_u16() as usize,
@@ -132,7 +150,7 @@ impl Response {
             Some(status_code) => match status_code.canonical_reason() {
                 Some(canonical_reason) => Ok(Self {
                     time: Local::now(),
-                    data: ResponseData::new(canonical_reason.into(), vec![]),
+                    data: ResponseData::new(canonical_reason.into(), vec![], "".into()),
                     selected_view: ResponseView::RAW,
                     code,
                     is_folded: true,
@@ -144,6 +162,7 @@ impl Response {
                             "During Request Error occured. Could not read error status code."
                                 .into(),
                             vec![],
+                            "".into(),
                         ),
                         selected_view: ResponseView::RAW,
                         code,
@@ -158,6 +177,7 @@ impl Response {
                     data: ResponseData::new(
                         "During Request Error occured. Could not read error reason.".into(),
                         vec![],
+                        "".into(),
                     ),
                     selected_view: ResponseView::RAW,
                     code,

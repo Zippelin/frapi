@@ -1,5 +1,6 @@
 /// Executro engine for reqeusting or keep sessions for requests
 use std::{
+    fmt::Debug,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -7,7 +8,11 @@ use std::{
 use tokio_tungstenite::tungstenite::Message as TokioMessage;
 
 use futures::{executor::block_on, SinkExt, StreamExt, TryStreamExt};
-use reqwest::Client;
+use reqwest::{
+    header::{HeaderName, HeaderValue},
+    redirect::Policy,
+    Client,
+};
 use tokio::{
     select,
     sync::mpsc::{channel, Receiver, Sender},
@@ -18,10 +23,19 @@ use tokio_tungstenite::connect_async;
 use crate::{
     settings::{Method, Protocol},
     states::{
-        main_page::{generics::Header, request::request_data::RequestData, response::Response},
+        main_page::{
+            generics::Header,
+            request::{
+                request_data::RequestData, HttpVersion, RequestHttpSetup, RequestSetup,
+                RequestWsSetup,
+            },
+            response::Response,
+        },
         Events,
     },
 };
+
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 
 /// Executor stares
 #[derive(PartialEq, Clone, Debug)]
@@ -178,6 +192,7 @@ impl Executor {
     pub fn execute(
         &mut self,
         data: &RequestData,
+        setup: &RequestSetup,
         connection_only: bool,
         events: Arc<Mutex<Events>>,
     ) {
@@ -214,8 +229,14 @@ impl Executor {
                 .unwrap()
                 .event_info(&format!("Detected free executor, sending http request..."));
             *self.state.lock().unwrap() = State::BUSY;
+
+            let setup = match setup.http() {
+                Some(val) => val,
+                None => &RequestHttpSetup::default(),
+            };
+
             if let Some(command) = message.get_command() {
-                self.spawn_http_connection(command, events);
+                self.spawn_http_connection(command, setup, events);
             }
 
             return;
@@ -232,6 +253,12 @@ impl Executor {
                 // If we need only connection - removing data from command, so it wont be executed during connection initialization
                 if connection_only {
                     command.drop_message();
+                };
+
+                // TODO: add settings to WS connection
+                let setup = match setup.ws() {
+                    Some(val) => val,
+                    None => &RequestWsSetup::default(),
                 };
 
                 self.spawn_ws_connection(command, events);
@@ -258,12 +285,18 @@ impl Executor {
     }
 
     /// Spawn separate thread for http reqeusts
-    fn spawn_http_connection(&mut self, message: Command, events: Arc<Mutex<Events>>) {
+    fn spawn_http_connection(
+        &mut self,
+        message: Command,
+        setup: &RequestHttpSetup,
+        events: Arc<Mutex<Events>>,
+    ) {
         let (sender, receiver) = channel::<Message>(100);
         self.channel_sender = Some(sender);
 
         tokio::spawn(Self::http_thread(
             message,
+            setup.clone(),
             Arc::clone(&self.responses),
             Arc::clone(&events),
             receiver,
@@ -271,9 +304,12 @@ impl Executor {
         ));
     }
 
+    // TODO: add autoredirect settings
+    // TODO: add headers response etc...
     /// Thread for http requests
     async fn http_thread(
         message: Command,
+        setup: RequestHttpSetup,
         responses: Arc<Mutex<Vec<Response>>>,
         events: Arc<Mutex<Events>>,
         mut command_channel: Receiver<Message>,
@@ -284,12 +320,35 @@ impl Executor {
                 let request_future = async {
                     let uri = format!("{}://{}", command_execute.protocol, command_execute.uri);
 
-                    // sleep(Duration::from_secs(50)).await;
+                    let mut builder = Client::builder();
+                    if setup.use_cookies {
+                        builder = builder.cookie_store(true);
+                    }
 
-                    let result = Client::new()
-                        .request(command_execute.method.into(), uri.clone())
-                        .send()
-                        .await;
+                    if setup.use_redicrects {
+                        builder = builder.redirect(Policy::limited(
+                            setup.redirects_amount.parse::<usize>().unwrap(),
+                        ));
+                    }
+
+                    match setup.http_version {
+                        HttpVersion::AUTO => {}
+                        HttpVersion::HTTPv1 => {
+                            builder = builder.http1_only();
+                        }
+                        HttpVersion::HTTPv2 => builder = builder.http2_prior_knowledge(),
+                    }
+
+                    let client = builder.build().unwrap();
+
+                    let mut result = client.request(command_execute.method.into(), uri.clone());
+
+                    for header in command_execute.headers {
+                        result = result.header(header.key, header.value);
+                    }
+
+                    let result = result.send().await;
+
                     let response = match result {
                         Ok(val) => match Response::from_http_response(val).await {
                             Ok(r) => {
@@ -382,7 +441,36 @@ impl Executor {
                     command_execute.uri
                 );
 
-                let (ws_stream, _) = match connect_async(&uri).await {
+                let mut request = uri.clone().into_client_request().unwrap();
+
+                for header in command_execute.headers {
+                    let key = match HeaderName::from_bytes(header.key.as_bytes()) {
+                        Ok(val) => val,
+                        Err(err) => {
+                            events.lock().unwrap().event_error(&format!(
+                                "Error: Cant conver header key. Error: {err}"
+                            ));
+
+                            *executor_state.lock().unwrap() = State::FREE;
+                            return;
+                        }
+                    };
+                    let value = match HeaderValue::from_str(&header.value) {
+                        Ok(val) => val,
+                        Err(err) => {
+                            events.lock().unwrap().event_error(&format!(
+                                "Error: Cant conver header value. Error: {err}"
+                            ));
+
+                            *executor_state.lock().unwrap() = State::FREE;
+                            return;
+                        }
+                    };
+
+                    request.headers_mut().insert(key, value);
+                }
+
+                let (ws_stream, _) = match connect_async(request).await {
                     Ok(data) => data,
                     Err(err) => {
                         events

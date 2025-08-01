@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use egui::{
-    text::LayoutJob, vec2, Align, CentralPanel, Color32, FontFamily, FontId, Frame, Layout, Margin,
-    ScrollArea, TextEdit, TextFormat, Ui,
+    text::LayoutJob, vec2, Align, CentralPanel, Color32, FontFamily, FontId, Frame, Grid, Label,
+    Layout, Margin, RichText, ScrollArea, TextEdit, TextFormat, TextWrapMode, Ui, WidgetText,
 };
 
 use crate::{
@@ -95,7 +97,10 @@ impl ResponsesListPanel {
     fn update_response_unfolded(&self, ui: &mut Ui, response: &mut Response, style: &Style) {
         ui.horizontal(|ui| {
             ui.radio_value(&mut response.selected_view, ResponseView::RAW, "Raw");
-            ui.radio_value(&mut response.selected_view, ResponseView::JSON, "Json");
+            if response.data.json_is_exist() {
+                ui.radio_value(&mut response.selected_view, ResponseView::JSON, "Json");
+            }
+
             ui.radio_value(
                 &mut response.selected_view,
                 ResponseView::HEADERS,
@@ -116,7 +121,50 @@ impl ResponsesListPanel {
                 );
             }
             // TODO: add headers of response
-            ResponseView::HEADERS => todo!(),
+            ResponseView::HEADERS => {
+                Frame::new()
+                    .inner_margin(Margin::same(5))
+                    .fill(style.color_main())
+                    .show(ui, |ui| {
+                        Grid::new(format!("response-headers-{}", response.time))
+                            .num_columns(2)
+                            .spacing(vec2(2., 5.))
+                            .min_col_width(100.)
+                            .striped(true)
+                            .show(ui, |ui| {
+                                ui.add(Label::new("URL").wrap_mode(TextWrapMode::Wrap));
+
+                                ui.add(
+                                    Label::new(WidgetText::RichText(Arc::new(
+                                        RichText::new(response.data.redictection_url.clone())
+                                            .font(style.fonts.label_strong())
+                                            .strong(),
+                                    )))
+                                    .wrap_mode(TextWrapMode::Wrap),
+                                );
+
+                                ui.end_row();
+
+                                for header in &response.data.headers {
+                                    ui.add(
+                                        Label::new(header.key.clone())
+                                            .wrap_mode(TextWrapMode::Wrap),
+                                    );
+
+                                    ui.add(
+                                        Label::new(WidgetText::RichText(Arc::new(
+                                            RichText::new(header.value.clone())
+                                                .font(style.fonts.label_strong())
+                                                .strong(),
+                                        )))
+                                        .wrap_mode(TextWrapMode::Wrap),
+                                    );
+
+                                    ui.end_row();
+                                }
+                            })
+                    });
+            }
         };
     }
 

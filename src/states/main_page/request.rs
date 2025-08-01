@@ -5,7 +5,10 @@ use serde_json::Value;
 
 use crate::{
     executor::{Executor, State},
-    settings::RequestSettings,
+    settings::{
+        HttpVersionSetting, RequestHttpSetupSettings, RequestSettings, RequestSetupSettings,
+        RequestWsSetupSettings,
+    },
     states::{
         main_page::{generics::Header, request::request_data::RequestData, response::Response},
         Events,
@@ -33,6 +36,9 @@ pub struct Request {
     pub executor: Executor,
     /// details or request currently on screen
     pub visible_details: RequestDetails,
+    pub visible_headers: RequestHeaders,
+    /// Settings for request
+    pub setup: RequestSetup,
 }
 
 /// From Settings -> State
@@ -63,6 +69,8 @@ impl From<&RequestSettings> for Request {
                 value: "".into(),
             },
             visible_details,
+            visible_headers: RequestHeaders::Custom,
+            setup: RequestSetup::from(&value.setup),
         }
     }
 }
@@ -80,12 +88,14 @@ impl Request {
             new_header: Header::default(),
             executor,
             visible_details: RequestDetails::Header,
+            visible_headers: RequestHeaders::Custom,
+            setup: RequestSetup::default(),
         }
     }
     /// Fire Executor to make requests
     pub fn go(&mut self, events: Arc<Mutex<Events>>, delay_send_message: bool) {
         self.executor
-            .execute(&self.draft, delay_send_message, events);
+            .execute(&self.draft, &self.setup, delay_send_message, events);
     }
 
     /// Stop Executor, also drop execution in progress
@@ -194,4 +204,175 @@ pub enum RequestDetails {
     Body,
     QueryParams,
     Message,
+    Setup,
+}
+
+/// Request details currently shown on UI
+#[derive(Debug, Clone, PartialEq)]
+pub enum RequestHeaders {
+    Default,
+    Custom,
+}
+
+pub fn default_ws_headers() -> Vec<Header> {
+    vec![
+        Header {
+            key: "Host".into(),
+            value: "<calculated...>".into(),
+        },
+        Header {
+            key: "Connection".into(),
+            value: "Upgrade".into(),
+        },
+        Header {
+            key: "Upgrade".into(),
+            value: "websocket".into(),
+        },
+        Header {
+            key: "Sec-WebSocket-Version".into(),
+            value: "13".into(),
+        },
+        Header {
+            key: "Sec-WebSocket-Key".into(),
+            value: "<calculated...>".into(),
+        },
+    ]
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum HttpVersion {
+    AUTO,
+    HTTPv1,
+    HTTPv2,
+}
+
+impl HttpVersion {
+    pub fn to_string(&self) -> String {
+        match self {
+            HttpVersion::AUTO => "AUTO".into(),
+            HttpVersion::HTTPv1 => "HTTPv1".into(),
+            HttpVersion::HTTPv2 => "HTTPv2".into(),
+        }
+    }
+}
+
+/// Settings to make reqeust
+#[derive(Debug, Clone)]
+pub enum RequestSetup {
+    HTTP(RequestHttpSetup),
+    WS(RequestWsSetup),
+}
+
+impl RequestSetup {
+    pub fn http(&self) -> Option<&RequestHttpSetup> {
+        match self {
+            RequestSetup::HTTP(request_http_setup) => Some(request_http_setup),
+            RequestSetup::WS(_) => None,
+        }
+    }
+
+    pub fn ws(&self) -> Option<&RequestWsSetup> {
+        match self {
+            RequestSetup::HTTP(_) => None,
+            RequestSetup::WS(request_ws_setup) => Some(request_ws_setup),
+        }
+    }
+
+    pub fn http_mut(&mut self) -> Option<&mut RequestHttpSetup> {
+        match self {
+            RequestSetup::HTTP(request_http_setup) => Some(request_http_setup),
+            RequestSetup::WS(_) => None,
+        }
+    }
+
+    pub fn ws_mut(&mut self) -> Option<&mut RequestWsSetup> {
+        match self {
+            RequestSetup::HTTP(_) => None,
+            RequestSetup::WS(request_ws_setup) => Some(request_ws_setup),
+        }
+    }
+
+    pub fn default_ws() -> Self {
+        Self::WS(RequestWsSetup::default())
+    }
+}
+
+impl From<&RequestSetupSettings> for RequestSetup {
+    fn from(value: &RequestSetupSettings) -> Self {
+        match value {
+            RequestSetupSettings::HTTP(request_http_setup_settings) => {
+                Self::HTTP(RequestHttpSetup::from(request_http_setup_settings))
+            }
+            RequestSetupSettings::WS(request_ws_setup_settings) => {
+                Self::WS(RequestWsSetup::from(request_ws_setup_settings))
+            }
+        }
+    }
+}
+
+impl Default for RequestSetup {
+    fn default() -> Self {
+        Self::HTTP(RequestHttpSetup::default())
+    }
+}
+
+/// Settings to make ws reqeust
+#[derive(Debug, Clone)]
+pub struct RequestWsSetup {
+    pub reconnection_timeout: String,
+    pub reconnection_attempts: String,
+}
+
+impl From<&RequestWsSetupSettings> for RequestWsSetup {
+    fn from(value: &RequestWsSetupSettings) -> Self {
+        Self {
+            reconnection_timeout: value.reconnection_timeout.to_string(),
+            reconnection_attempts: value.reconnection_attempts.to_string(),
+        }
+    }
+}
+
+impl Default for RequestWsSetup {
+    fn default() -> Self {
+        Self {
+            reconnection_timeout: "5000".into(),
+            reconnection_attempts: "3".into(),
+        }
+    }
+}
+
+/// Settings to make http reqeust
+#[derive(Debug, Clone)]
+pub struct RequestHttpSetup {
+    pub http_version: HttpVersion,
+    pub use_cookies: bool,
+    pub use_redicrects: bool,
+    pub redirects_amount: String,
+}
+
+impl Default for RequestHttpSetup {
+    fn default() -> Self {
+        Self {
+            http_version: HttpVersion::AUTO,
+            use_cookies: true,
+            use_redicrects: true,
+            redirects_amount: "9".into(),
+        }
+    }
+}
+
+impl From<&RequestHttpSetupSettings> for RequestHttpSetup {
+    fn from(value: &RequestHttpSetupSettings) -> Self {
+        let http_version = match value.http_version {
+            HttpVersionSetting::HTTPv1 => HttpVersion::HTTPv1,
+            HttpVersionSetting::HTTPv2 => HttpVersion::HTTPv2,
+            HttpVersionSetting::AUTO => HttpVersion::AUTO,
+        };
+        Self {
+            http_version,
+            use_cookies: value.use_cookies,
+            use_redicrects: value.use_redicrects,
+            redirects_amount: value.redirects_amount.to_string(),
+        }
+    }
 }

@@ -6,14 +6,18 @@ pub struct ResponseData {
     pub raw: String,
     pub json: JsonView,
     pub headers: Vec<Header>,
+    pub redictection_url: String,
+    pub redirection: Vec<Redicrections>,
 }
 
 impl ResponseData {
-    pub fn new(raw: String, headers: Vec<Header>) -> Self {
+    pub fn new(raw: String, headers: Vec<Header>, redictection_url: String) -> Self {
         Self {
             json: JsonView::new(&raw),
             raw,
             headers,
+            redictection_url,
+            redirection: vec![],
         }
     }
 
@@ -21,4 +25,12 @@ impl ResponseData {
     pub fn json_is_exist(&self) -> bool {
         !self.json.complex.is_null()
     }
+    
+}
+
+/// Data with page redirection after initial request
+#[derive(Debug, Clone)]
+pub struct Redicrections {
+    pub headers: Vec<Header>,
+    pub redictection_url: String,
 }

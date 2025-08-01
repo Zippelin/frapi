@@ -11,7 +11,9 @@ use crate::{
         main_page::{
             entity::Entity,
             generics::{CountedText, Header},
-            request::RequestDetails,
+            request::{
+                default_ws_headers, HttpVersion, RequestDetails, RequestHeaders, RequestSetup,
+            },
         },
         States, Style,
     },
@@ -78,12 +80,14 @@ impl RequestDetailsPanel {
                         ui.radio_value(&mut request.visible_details, RequestDetails::Body, "Body");
                     }
 
+                    ui.radio_value(&mut request.visible_details, RequestDetails::Setup, "Setup");
+
                     ui.add(Separator::default().horizontal());
                 });
 
                 ui.add_space(10.);
 
-                // TODO: add layout for WS requests
+                // TODO: add binary to send
 
                 // Select view of request part
                 let request = states.main_page.selected_request().unwrap();
@@ -92,12 +96,267 @@ impl RequestDetailsPanel {
                     RequestDetails::Body => self.update_body(ui, states),
                     RequestDetails::QueryParams => self.update_query_params(ui, states),
                     RequestDetails::Message => self.update_message(ui, states),
+                    RequestDetails::Setup => self.update_setup(ui, states),
                 };
             })
         });
     }
 
-    /// Draw Message for ws
+    /// Draw Setup Settings
+    fn update_setup(&self, ui: &mut Ui, states: &mut States) {
+        ScrollArea::vertical().show(ui, |ui| {
+            let request = states.main_page.selected_request_mut().unwrap();
+
+            match request.draft.protocol {
+                Protocol::HTTP | Protocol::HTTPS => self.update_setup_http(ui, states),
+
+                Protocol::WS | Protocol::WSS => self.update_setup_ws(ui, states),
+            }
+        });
+    }
+
+    fn update_setup_http(&self, ui: &mut Ui, states: &mut States) {
+        let request = states.main_page.selected_request_mut().unwrap();
+        let setup = request.setup.http_mut().unwrap();
+        Frame::new().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.add(Label::new("HTTP version:"));
+
+                ui.add_space(50.);
+                ui.menu_button(setup.http_version.to_string(), |ui| {
+                    ui.style_mut().spacing.button_padding = vec2(5., 5.);
+
+                    if setup.http_version != HttpVersion::AUTO {
+                        if ui.button("AUTO").clicked() {
+                            setup.http_version = HttpVersion::AUTO;
+                            request.is_changed = true
+                        }
+                    }
+
+                    if setup.http_version != HttpVersion::HTTPv1 {
+                        if ui.button("HTTPv1").clicked() {
+                            setup.http_version = HttpVersion::HTTPv1;
+                            request.is_changed = true
+                        }
+                    }
+
+                    if setup.http_version != HttpVersion::HTTPv2 {
+                        if ui.button("HTTPv2").clicked() {
+                            setup.http_version = HttpVersion::HTTPv2;
+                            request.is_changed = true
+                        }
+                    }
+                });
+
+                ui.add_space(ui.available_width());
+            })
+        });
+
+        ui.add_space(10.);
+
+        Frame::new().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.add(Label::new("Use cookies:"));
+
+                ui.add_space(60.);
+                ui.style_mut().spacing.button_padding = vec2(5., 5.);
+                ui.style_mut().spacing.item_spacing = vec2(1., 10.);
+
+                if ui
+                    .add(
+                        Button::new(WidgetText::RichText(Arc::new(
+                            RichText::new("true").color(states.style.color_main()),
+                        )))
+                        .corner_radius(CornerRadius::ZERO)
+                        .fill(if setup.use_cookies {
+                            states.style.color_lighter()
+                        } else {
+                            states.style.color_light()
+                        }),
+                    )
+                    .clicked()
+                {
+                    setup.use_cookies = true;
+                    request.is_changed = true
+                };
+                if ui
+                    .add(
+                        Button::new(WidgetText::RichText(Arc::new(
+                            RichText::new("false").color(states.style.color_main()),
+                        )))
+                        .corner_radius(CornerRadius::ZERO)
+                        .fill(if !setup.use_cookies {
+                            states.style.color_lighter()
+                        } else {
+                            states.style.color_light()
+                        }),
+                    )
+                    .clicked()
+                {
+                    setup.use_cookies = false;
+                    request.is_changed = true
+                };
+            });
+        });
+
+        ui.add_space(10.);
+
+        Frame::new().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.add(Label::new("Use redicrects:"));
+
+                ui.add_space(45.);
+
+                ui.style_mut().spacing.button_padding = vec2(5., 5.);
+                ui.style_mut().spacing.item_spacing = vec2(1., 10.);
+
+                if ui
+                    .add(
+                        Button::new(WidgetText::RichText(Arc::new(
+                            RichText::new("true").color(states.style.color_main()),
+                        )))
+                        .corner_radius(CornerRadius::ZERO)
+                        .fill(if setup.use_redicrects {
+                            states.style.color_lighter()
+                        } else {
+                            states.style.color_light()
+                        }),
+                    )
+                    .clicked()
+                {
+                    setup.use_redicrects = true;
+                    request.is_changed = true
+                };
+                if ui
+                    .add(
+                        Button::new(WidgetText::RichText(Arc::new(
+                            RichText::new("false").color(states.style.color_main()),
+                        )))
+                        .corner_radius(CornerRadius::ZERO)
+                        .fill(if !setup.use_redicrects {
+                            states.style.color_lighter()
+                        } else {
+                            states.style.color_light()
+                        }),
+                    )
+                    .clicked()
+                {
+                    setup.use_redicrects = false;
+                    request.is_changed = true
+                };
+            });
+        });
+
+        ui.add_space(10.);
+
+        Frame::new().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.add(Label::new("Redirects amount:"));
+
+                ui.add_space(25.);
+
+                let initial_value = setup.redirects_amount.clone();
+                if ui
+                    .add(
+                        TextEdit::singleline(&mut setup.redirects_amount)
+                            .char_limit(2)
+                            .desired_width(20.),
+                    )
+                    .changed()
+                {
+                    match setup.redirects_amount.parse::<usize>() {
+                        Ok(val) => {
+                            setup.redirects_amount = val.to_string();
+                            request.is_changed = true
+                        }
+                        Err(_) => {
+                            if setup.redirects_amount.len() == 0 {
+                                setup.redirects_amount = "0".into();
+                                request.is_changed = true
+                            } else {
+                                setup.redirects_amount = initial_value;
+                            }
+                        }
+                    }
+                };
+            });
+        });
+    }
+
+    fn update_setup_ws(&self, ui: &mut Ui, states: &mut States) {
+        let request = states.main_page.selected_request_mut().unwrap();
+
+        let setup = request.setup.ws_mut().unwrap();
+
+        Frame::new().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.add(Label::new("Reconnection timeout:"));
+
+                ui.add_space(25.);
+
+                let initial_value = setup.reconnection_timeout.clone();
+                if ui
+                    .add(
+                        TextEdit::singleline(&mut setup.reconnection_timeout)
+                            .char_limit(10)
+                            .desired_width(70.),
+                    )
+                    .changed()
+                {
+                    match setup.reconnection_timeout.parse::<usize>() {
+                        Ok(val) => {
+                            setup.reconnection_timeout = val.to_string();
+                            request.is_changed = true
+                        }
+                        Err(_) => {
+                            if setup.reconnection_timeout.len() == 0 {
+                                setup.reconnection_timeout = "0".into();
+                                request.is_changed = true
+                            } else {
+                                setup.reconnection_timeout = initial_value;
+                            }
+                        }
+                    }
+                };
+            });
+        });
+
+        ui.add_space(10.);
+
+        Frame::new().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.add(Label::new("Reconnection attempts:"));
+
+                ui.add_space(20.);
+
+                let initial_value = setup.reconnection_attempts.clone();
+                if ui
+                    .add(
+                        TextEdit::singleline(&mut setup.reconnection_attempts)
+                            .char_limit(2)
+                            .desired_width(20.),
+                    )
+                    .changed()
+                {
+                    match setup.reconnection_attempts.parse::<usize>() {
+                        Ok(val) => {
+                            setup.reconnection_attempts = val.to_string();
+                            request.is_changed = true
+                        }
+                        Err(_) => {
+                            if setup.reconnection_attempts.len() == 0 {
+                                setup.reconnection_attempts = "0".into();
+                                request.is_changed = true
+                            } else {
+                                setup.reconnection_attempts = initial_value;
+                            }
+                        }
+                    }
+                };
+            });
+        });
+    }
+
     fn update_message(&self, ui: &mut Ui, states: &mut States) {
         ui.group(|ui| {
             let request = states.main_page.selected_request_mut().unwrap();
@@ -187,7 +446,7 @@ impl RequestDetailsPanel {
             .update_generic_headers_table(
                 ui,
                 &mut request.draft.query_params,
-                &mut request.new_header,
+                Some(&mut request.new_header),
                 &states.style,
             )
             .is_some()
@@ -280,12 +539,13 @@ impl RequestDetailsPanel {
     }
 
     /// Draw generic table of headers.
+    /// If no new_value provided - all data is read only
     /// Return is_changed state - Some() - heave changes, None - no changes.
     fn update_generic_headers_table(
         &self,
         ui: &mut Ui,
         items: &mut Vec<Header>,
-        new_value: &mut Header,
+        new_value: Option<&mut Header>,
         style: &Style,
     ) -> Option<()> {
         let mut is_changes = None;
@@ -319,42 +579,48 @@ impl RequestDetailsPanel {
                                 is_changes = Some(())
                             }
 
-                            if ui
-                                .add(Button::new("x").fill(style.color_danger()))
-                                .clicked()
-                            {
-                                header_idx_for_remove = Some(i);
+                            if new_value.is_some() {
+                                if ui
+                                    .add(Button::new("x").fill(style.color_danger()))
+                                    .clicked()
+                                {
+                                    header_idx_for_remove = Some(i);
+                                }
                             }
                         });
                     }
 
-                    // Deleting marked header
-                    if header_idx_for_remove.is_some() {
-                        items.swap_remove(header_idx_for_remove.take().unwrap());
-                        // request.is_changed = true;
-                        is_changes = Some(())
+                    if new_value.is_some() {
+                        // Deleting marked header
+                        if header_idx_for_remove.is_some() {
+                            items.swap_remove(header_idx_for_remove.take().unwrap());
+                            // request.is_changed = true;
+                            is_changes = Some(())
+                        }
                     }
 
-                    ui.horizontal(|ui| {
-                        let new_header_key_resp = ui.text_edit_singleline(&mut new_value.key);
-                        let new_header_val_resp = ui.add(
-                            TextEdit::singleline(&mut new_value.value)
-                                .desired_width(ui.available_width() - 25.),
-                        );
-                        if new_header_key_resp.changed() || new_header_val_resp.changed() {
-                            if new_value.key != "" || new_value.value != "" {
-                                items.push(Header {
-                                    key: new_value.key.clone(),
-                                    value: new_value.value.clone(),
-                                });
+                    if let Some(new_value) = new_value {
+                        ui.horizontal(|ui| {
+                            let new_header_key_resp = ui.text_edit_singleline(&mut new_value.key);
+                            let new_header_val_resp = ui.add(
+                                TextEdit::singleline(&mut new_value.value)
+                                    .desired_width(ui.available_width() - 25.),
+                            );
+                            if new_header_key_resp.changed() || new_header_val_resp.changed() {
+                                if new_value.key != "" || new_value.value != "" {
+                                    items.push(Header {
+                                        key: new_value.key.clone(),
+                                        value: new_value.value.clone(),
+                                    });
 
-                                new_value.key = "".into();
-                                new_value.value = "".into();
-                                // request.is_changed = true
-                                is_changes = Some(())
+                                    new_value.key = "".into();
+                                    new_value.value = "".into();
+                                    // request.is_changed = true
+                                    is_changes = Some(())
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
                 });
         });
         is_changes
@@ -370,17 +636,51 @@ impl RequestDetailsPanel {
 
         let request = request.unwrap();
 
-        if self
-            .update_generic_headers_table(
-                ui,
-                &mut request.draft.headers,
-                &mut request.new_header,
-                &states.style,
-            )
-            .is_some()
-        {
-            request.is_changed = true
-        };
+        if [Protocol::WS, Protocol::WSS].contains(&request.draft.protocol) {
+            ui.horizontal(|ui| {
+                if ui
+                    .add(Button::new("Custom").fill(
+                        if request.visible_headers == RequestHeaders::Custom {
+                            states.style.color_light()
+                        } else {
+                            states.style.color_main()
+                        },
+                    ))
+                    .clicked()
+                {
+                    request.visible_headers = RequestHeaders::Custom
+                };
+
+                if ui
+                    .add(Button::new("Default").fill(
+                        if request.visible_headers == RequestHeaders::Default {
+                            states.style.color_light()
+                        } else {
+                            states.style.color_main()
+                        },
+                    ))
+                    .clicked()
+                {
+                    request.visible_headers = RequestHeaders::Default
+                };
+            });
+        }
+
+        if request.visible_headers == RequestHeaders::Custom {
+            if self
+                .update_generic_headers_table(
+                    ui,
+                    &mut request.draft.headers,
+                    Some(&mut request.new_header),
+                    &states.style,
+                )
+                .is_some()
+            {
+                request.is_changed = true
+            };
+        } else {
+            self.update_generic_headers_table(ui, &mut default_ws_headers(), None, &states.style);
+        }
     }
 
     /// Draw URL group
@@ -484,6 +784,14 @@ impl RequestDetailsPanel {
                                     Protocol::WSS,
                                     "WSS",
                                 );
+
+                                if protocol_https_resp.changed() || protocol_http_resp.changed() {
+                                    request.setup = RequestSetup::default()
+                                }
+
+                                if protocol_ws_resp.changed() || protocol_wss_resp.changed() {
+                                    request.setup = RequestSetup::default_ws()
+                                }
 
                                 if protocol_http_resp.changed()
                                     || protocol_https_resp.changed()
