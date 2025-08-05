@@ -5,10 +5,14 @@ use std::{
 };
 
 use chrono::{DateTime, Local};
-use egui::Color32;
+use egui::{vec2, Color32, Pos2, Vec2};
 
 use crate::{
-    settings::{Options as SettingsOptions, Settings, UISettings, UITheme},
+    settings::{
+        options_settings::OptionsSettings,
+        ui_settings::{UISettings, UITheme},
+        Settings,
+    },
     states::main_page::{entity::Entity, MainPage},
     ui::{colors::ThemeColors, fonts::Fonts},
 };
@@ -243,6 +247,12 @@ impl Style {
             Theme::Dark(theme_colors) => theme_colors.warning,
         }
     }
+    pub fn is_dark_theme(&self) -> bool {
+        match self.theme {
+            Theme::Light(_) => false,
+            Theme::Dark(_) => true,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -251,13 +261,22 @@ pub enum Page {
 }
 
 #[derive(Clone, Debug)]
-pub struct Options {}
+pub struct Options {
+    pub window_size: Vec2,
+    pub window_position: Option<Pos2>,
+}
 
-impl From<&SettingsOptions> for Options {
-    fn from(value: &SettingsOptions) -> Self {
-        let _ = value;
-        // TODO: make convertion from settings options to state options
-        Self {}
+impl From<&OptionsSettings> for Options {
+    fn from(value: &OptionsSettings) -> Self {
+        let window_position = if let Some(pos) = value.window_position {
+            Some(Pos2 { x: pos.0, y: pos.1 })
+        } else {
+            None
+        };
+        Self {
+            window_size: vec2(value.window_size.0, value.window_size.1),
+            window_position,
+        }
     }
 }
 
@@ -305,6 +324,7 @@ impl IntoIterator for Events {
     }
 }
 
+/// Events across application
 #[derive(Debug, Clone)]
 pub enum Event {
     Info(EventData),

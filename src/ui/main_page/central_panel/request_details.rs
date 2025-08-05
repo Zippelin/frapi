@@ -7,13 +7,17 @@ use egui::{
 use rfd::FileDialog;
 
 use crate::{
-    settings::{Method, Protocol},
+    settings::main_settings::entity::request_settings::{
+        method_settigns::Method, protocol_settings::Protocol,
+    },
     states::{
         main_page::{
             entity::Entity,
             generics::{CountedText, Header},
             request::{
-                default_ws_headers, HttpVersion, RequestDetails, RequestHeaders, RequestSetup,
+                default_ws_headers,
+                request_data::{BodyFromData, FormFieldType},
+                HttpVersion, RequestBodyDetails, RequestDetails, RequestHeaders, RequestSetup,
             },
         },
         States, Style,
@@ -34,7 +38,7 @@ impl RequestDetailsPanel {
             states.main_page.selected_request_salt()
         ))
         .resizable(true)
-        .height_range(250.0..=400.)
+        .min_height(250.)
         .frame(
             Frame::new()
                 .fill(states.style.color_main())
@@ -79,11 +83,6 @@ impl RequestDetailsPanel {
 
                     if request.draft.protocot_is_http() {
                         ui.radio_value(&mut request.visible_details, RequestDetails::Body, "Body");
-                        ui.radio_value(
-                            &mut request.visible_details,
-                            RequestDetails::Binary,
-                            "Binary",
-                        );
                     }
 
                     ui.radio_value(&mut request.visible_details, RequestDetails::Setup, "Setup");
@@ -100,30 +99,8 @@ impl RequestDetailsPanel {
                     RequestDetails::Body => self.update_body(ui, states),
                     RequestDetails::QueryParams => self.update_query_params(ui, states),
                     RequestDetails::Message => self.update_message(ui, states),
-                    RequestDetails::Binary => self.update_binary(ui, states),
                     RequestDetails::Setup => self.update_setup(ui, states),
                 };
-            })
-        });
-    }
-    /// Draw binary file select
-    fn update_binary(&self, ui: &mut Ui, states: &mut States) {
-        ui.horizontal(|ui| {
-            ui.group(|ui| {
-                let request = states.main_page.selected_request_mut().unwrap();
-
-                ui.add(
-                    TextEdit::singleline(&mut request.draft.binary_path)
-                        .desired_width(ui.available_width() - 65.),
-                );
-
-                if ui.add(Button::new("Browse")).clicked() {
-                    let file = FileDialog::new().set_directory("./").pick_file();
-                    if let Some(file_path) = file {
-                        request.draft.binary_path = file_path.to_string_lossy().to_string();
-                        request.is_changed = true;
-                    }
-                }
             })
         });
     }
@@ -143,10 +120,10 @@ impl RequestDetailsPanel {
 
     fn update_setup_http(&self, ui: &mut Ui, states: &mut States) {
         let request = states.main_page.selected_request_mut().unwrap();
-        let setup = request.setup.http_mut().unwrap();
+        let setup = request.draft.setup.http_mut().unwrap();
         Frame::new().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.add(Label::new("HTTP version:"));
+                ui.add(Label::new(states.style.fonts.label_text("HTTP version:")));
 
                 ui.add_space(50.);
                 ui.menu_button(setup.http_version.to_string(), |ui| {
@@ -182,7 +159,7 @@ impl RequestDetailsPanel {
 
         Frame::new().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.add(Label::new("Use cookies:"));
+                ui.add(Label::new(states.style.fonts.label_text("Use cookies:")));
 
                 ui.add_space(60.);
                 ui.style_mut().spacing.button_padding = vec2(5., 5.);
@@ -229,9 +206,11 @@ impl RequestDetailsPanel {
 
         Frame::new().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.add(Label::new("Use redicrects:"));
+                ui.add(
+                    Label::new(states.style.fonts.label_text("Use redirects:")).selectable(false),
+                );
 
-                ui.add_space(45.);
+                ui.add_space(44.);
 
                 ui.style_mut().spacing.button_padding = vec2(5., 5.);
                 ui.style_mut().spacing.item_spacing = vec2(1., 10.);
@@ -242,7 +221,7 @@ impl RequestDetailsPanel {
                             RichText::new("true").color(states.style.color_main()),
                         )))
                         .corner_radius(CornerRadius::ZERO)
-                        .fill(if setup.use_redicrects {
+                        .fill(if setup.use_redirects {
                             states.style.color_lighter()
                         } else {
                             states.style.color_light()
@@ -250,7 +229,7 @@ impl RequestDetailsPanel {
                     )
                     .clicked()
                 {
-                    setup.use_redicrects = true;
+                    setup.use_redirects = true;
                     request.is_changed = true
                 };
                 if ui
@@ -259,7 +238,7 @@ impl RequestDetailsPanel {
                             RichText::new("false").color(states.style.color_main()),
                         )))
                         .corner_radius(CornerRadius::ZERO)
-                        .fill(if !setup.use_redicrects {
+                        .fill(if !setup.use_redirects {
                             states.style.color_lighter()
                         } else {
                             states.style.color_light()
@@ -267,7 +246,7 @@ impl RequestDetailsPanel {
                     )
                     .clicked()
                 {
-                    setup.use_redicrects = false;
+                    setup.use_redirects = false;
                     request.is_changed = true
                 };
             });
@@ -277,9 +256,11 @@ impl RequestDetailsPanel {
 
         Frame::new().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.add(Label::new("Redirects amount:"));
+                ui.add(Label::new(
+                    states.style.fonts.label_text("Redirects amount:"),
+                ));
 
-                ui.add_space(25.);
+                ui.add_space(20.);
 
                 let initial_value = setup.redirects_amount.clone();
                 if ui
@@ -312,11 +293,13 @@ impl RequestDetailsPanel {
     fn update_setup_ws(&self, ui: &mut Ui, states: &mut States) {
         let request = states.main_page.selected_request_mut().unwrap();
 
-        let setup = request.setup.ws_mut().unwrap();
+        let setup = request.draft.setup.ws_mut().unwrap();
 
         Frame::new().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.add(Label::new("Reconnection timeout:"));
+                ui.add(Label::new(
+                    states.style.fonts.label_text("Reconnection timeout:"),
+                ));
 
                 ui.add_space(25.);
 
@@ -351,7 +334,9 @@ impl RequestDetailsPanel {
 
         Frame::new().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.add(Label::new("Reconnection attempts:"));
+                ui.add(Label::new(
+                    states.style.fonts.label_text("Reconnection attempts:"),
+                ));
 
                 ui.add_space(20.);
 
@@ -485,8 +470,90 @@ impl RequestDetailsPanel {
     /// Draw body part
     fn update_body(&self, ui: &mut Ui, states: &mut States) {
         let request = states.main_page.selected_request_mut().unwrap();
+        ui.group(|ui| {
+            ui.horizontal(|ui| {
+                if ui
+                    .add(
+                        Button::new("Raw")
+                            .selected(request.visible_body == RequestBodyDetails::Raw),
+                    )
+                    .clicked()
+                {
+                    request.visible_body = RequestBodyDetails::Raw
+                }
+
+                if ui
+                    .add(
+                        Button::new("Form Data")
+                            .selected(request.visible_body == RequestBodyDetails::FormData),
+                    )
+                    .clicked()
+                {
+                    request.visible_body = RequestBodyDetails::FormData
+                }
+                if ui
+                    .add(
+                        Button::new("Binary")
+                            .selected(request.visible_body == RequestBodyDetails::Binary),
+                    )
+                    .clicked()
+                {
+                    request.visible_body = RequestBodyDetails::Binary
+                }
+                ui.add_space(ui.available_width());
+            });
+        });
+
+        match request.visible_body {
+            RequestBodyDetails::Raw => self.update_body_raw(ui, states),
+            RequestBodyDetails::FormData => self.update_body_formdata(ui, states),
+            RequestBodyDetails::Binary => self.update_body_binary(ui, states),
+        }
+    }
+
+    /// Draw binary file select
+    fn update_body_binary(&self, ui: &mut Ui, states: &mut States) {
+        ui.horizontal(|ui| {
+            ui.group(|ui| {
+                let request = states.main_page.selected_request_mut().unwrap();
+
+                ui.add(
+                    TextEdit::singleline(&mut request.draft.body.binary_path)
+                        .desired_width(ui.available_width() - 65.),
+                );
+
+                if ui.add(Button::new("Browse")).clicked() {
+                    let file = FileDialog::new().set_directory("./").pick_file();
+                    if let Some(file_path) = file {
+                        request.draft.body.binary_path = file_path.to_string_lossy().to_string();
+                        request.is_changed = true;
+                    }
+                }
+            })
+        });
+    }
+
+    /// Draw form data
+    fn update_body_formdata(&self, ui: &mut Ui, states: &mut States) {
+        let request = states.main_page.selected_request_mut().unwrap();
         if self
-            .update_counted_textedit(ui, &mut request.draft.body, &states.style)
+            .update_form_data_table(
+                ui,
+                &mut request.draft.body.form_data,
+                Some(&mut request.new_body_form_field),
+                &states.style,
+            )
+            .is_some()
+        {
+            request.is_changed = true
+        };
+    }
+
+    /// Draw body part
+    fn update_body_raw(&self, ui: &mut Ui, states: &mut States) {
+        let request = states.main_page.selected_request_mut().unwrap();
+        if self
+            .update_counted_textedit(ui, &mut request.draft.body.raw, &states.style)
             .is_some()
         {
             request.is_changed = true;
@@ -565,6 +632,140 @@ impl RequestDetailsPanel {
     }
 
     /// Draw generic table of headers.
+    /// If no new_value provided - all data is read only
+    /// Return is_changed state - Some() - heave changes, None - no changes.
+    fn update_form_data_table(
+        &self,
+        ui: &mut Ui,
+        items: &mut Vec<BodyFromData>,
+        new_value: Option<&mut BodyFromData>,
+        style: &Style,
+    ) -> Option<()> {
+        let mut is_changes = None;
+        ScrollArea::vertical().show(ui, |ui| {
+            ui.style_mut().spacing.item_spacing = vec2(2., 2.);
+            ui.style_mut().visuals.widgets.active.corner_radius = CornerRadius::ZERO;
+            ui.style_mut().visuals.widgets.inactive.corner_radius = CornerRadius::ZERO;
+            ui.style_mut().visuals.widgets.hovered.corner_radius = CornerRadius::ZERO;
+
+            let mut header_idx_for_remove = None;
+
+            Frame::new()
+                .inner_margin(Margin::same(10).left_top())
+                .show(ui, |ui| {
+                    for i in 0..items.len() {
+                        ui.horizontal(|ui| {
+                            let header_key_resp = ui.add(
+                                TextEdit::singleline(&mut items[i].key)
+                                    .text_color(style.color_main())
+                                    .font(style.fonts.textedit_small()),
+                            );
+
+                            ComboBox::from_id_salt(format!("form-data-field-type-{i}"))
+                                .selected_text(items[i].field_type.to_string())
+                                .width(50.)
+                                .show_ui(ui, |ui| {
+                                    let field_type_text = ui.selectable_value(
+                                        &mut items[i].field_type,
+                                        FormFieldType::Text,
+                                        "Text",
+                                    );
+                                    let field_type_file = ui.selectable_value(
+                                        &mut items[i].field_type,
+                                        FormFieldType::File,
+                                        "File",
+                                    );
+
+                                    if field_type_file.changed() || field_type_text.changed() {
+                                        is_changes = Some(());
+                                        items[i].value = "".into();
+                                    }
+                                });
+
+                            let header_value_reasp = ui.add(
+                                TextEdit::singleline(&mut items[i].value)
+                                    .desired_width(ui.available_width() - 25.)
+                                    .text_color(style.color_main())
+                                    .font(style.fonts.textedit_small()),
+                            );
+
+                            if header_key_resp.changed() || header_value_reasp.changed() {
+                                is_changes = Some(())
+                            }
+
+                            if new_value.is_some() {
+                                if ui
+                                    .add(Button::new("x").fill(style.color_danger()))
+                                    .clicked()
+                                {
+                                    header_idx_for_remove = Some(i);
+                                }
+                            }
+                        });
+                    }
+
+                    if new_value.is_some() {
+                        // Deleting marked header
+                        if header_idx_for_remove.is_some() {
+                            items.swap_remove(header_idx_for_remove.take().unwrap());
+                            // request.is_changed = true;
+                            is_changes = Some(())
+                        }
+                    }
+
+                    if let Some(new_value) = new_value {
+                        ui.horizontal(|ui| {
+                            let new_header_key_resp = ui.add(
+                                TextEdit::singleline(&mut new_value.key).hint_text("new form key"),
+                            );
+
+                            ComboBox::from_id_salt(format!("form-data-field-type-new"))
+                                .selected_text(new_value.field_type.to_string())
+                                .width(50.)
+                                .show_ui(ui, |ui| {
+                                    let field_type_text = ui.selectable_value(
+                                        &mut new_value.field_type,
+                                        FormFieldType::Text,
+                                        "Text",
+                                    );
+                                    let field_type_file = ui.selectable_value(
+                                        &mut new_value.field_type,
+                                        FormFieldType::File,
+                                        "File",
+                                    );
+
+                                    if field_type_file.changed() || field_type_text.changed() {
+                                        is_changes = Some(())
+                                    }
+                                });
+
+                            let new_header_val_resp = ui.add(
+                                TextEdit::singleline(&mut new_value.value)
+                                    .desired_width(ui.available_width() - 25.)
+                                    .hint_text("new form value"),
+                            );
+                            if new_header_key_resp.changed() || new_header_val_resp.changed() {
+                                if new_value.key != "" || new_value.value != "" {
+                                    items.push(BodyFromData {
+                                        key: new_value.key.clone(),
+                                        value: new_value.value.clone(),
+                                        field_type: new_value.field_type.clone(),
+                                    });
+
+                                    new_value.key = "".into();
+                                    new_value.value = "".into();
+                                    new_value.field_type = FormFieldType::Text;
+                                    is_changes = Some(())
+                                }
+                            }
+                        });
+                    }
+                });
+        });
+        is_changes
+    }
+
+    /// Draw Form Data Table.
     /// If no new_value provided - all data is read only
     /// Return is_changed state - Some() - heave changes, None - no changes.
     fn update_generic_headers_table(
@@ -812,11 +1013,11 @@ impl RequestDetailsPanel {
                                 );
 
                                 if protocol_https_resp.changed() || protocol_http_resp.changed() {
-                                    request.setup = RequestSetup::default()
+                                    request.draft.setup = RequestSetup::default()
                                 }
 
                                 if protocol_ws_resp.changed() || protocol_wss_resp.changed() {
-                                    request.setup = RequestSetup::default_ws()
+                                    request.draft.setup = RequestSetup::default_ws()
                                 }
 
                                 if protocol_http_resp.changed()

@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use egui::{FontFamily, FontId, FontSelection};
+use egui::{FontFamily, FontId, FontSelection, RichText};
 
 #[derive(Debug, Clone)]
 pub struct Fonts {
@@ -67,6 +67,14 @@ impl Fonts {
     }
     pub fn textedit_small(&self) -> FontSelection {
         FontSelection::FontId(self.small_textedit.clone())
+    }
+
+    pub fn menu_text(&self, text: &str) -> RichText {
+        RichText::new(text).monospace().strong()
+    }
+
+    pub fn label_text(&self, text: &str) -> RichText {
+        RichText::new(text).monospace().strong().size(14.)
     }
 
     pub fn header1(&self) -> FontId {

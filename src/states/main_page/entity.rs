@@ -1,5 +1,5 @@
 use crate::{
-    settings::Entity as SettingsEntity,
+    settings::main_settings::entity::Entity as SettingsEntity,
     states::main_page::{collection::Collection, request::Request},
 };
 

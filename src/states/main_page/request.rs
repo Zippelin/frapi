@@ -6,11 +6,17 @@ use serde_json::Value;
 use crate::{
     executor::{Executor, State},
     settings::{
-        HttpVersionSetting, RequestHttpSetupSettings, RequestSettings, RequestSetupSettings,
-        RequestWsSetupSettings,
+        main_settings::entity::request_settings::{
+            request_setup_settings::RequestSetupSettings, RequestSettings,
+        },
+        HttpVersionSetting, RequestHttpSetupSettings, RequestWsSetupSettings,
     },
     states::{
-        main_page::{generics::Header, request::request_data::RequestData, response::Response},
+        main_page::{
+            generics::{CountedText, Header},
+            request::request_data::{BodyFromData, FormFieldType, RequestData},
+            response::Response,
+        },
         Events,
     },
 };
@@ -30,15 +36,17 @@ pub struct Request {
     pub draft: RequestData,
     /// vec of responses
     pub responses: Arc<Mutex<Vec<Response>>>,
-    /// hew header data - for UI, to add new neader
+    /// new header data - for UI, to add new neader
     pub new_header: Header,
+    /// new form data - for UI, to add new field
+    pub new_body_form_field: BodyFromData,
     /// request executor engine
     pub executor: Executor,
     /// details or request currently on screen
     pub visible_details: RequestDetails,
+    /// headers currently visible on screen
     pub visible_headers: RequestHeaders,
-    /// Settings for request
-    pub setup: RequestSetup,
+    pub visible_body: RequestBodyDetails,
 }
 
 /// From Settings -> State
@@ -70,7 +78,12 @@ impl From<&RequestSettings> for Request {
             },
             visible_details,
             visible_headers: RequestHeaders::Custom,
-            setup: RequestSetup::from(&value.setup),
+            visible_body: RequestBodyDetails::Raw,
+            new_body_form_field: BodyFromData {
+                key: "".into(),
+                value: "".into(),
+                field_type: FormFieldType::Text,
+            },
         }
     }
 }
@@ -89,13 +102,34 @@ impl Request {
             executor,
             visible_details: RequestDetails::Header,
             visible_headers: RequestHeaders::Custom,
-            setup: RequestSetup::default(),
+            visible_body: RequestBodyDetails::Raw,
+            new_body_form_field: BodyFromData {
+                key: "".into(),
+                value: "".into(),
+                field_type: FormFieldType::Text,
+            },
         }
     }
     /// Fire Executor to make requests
     pub fn go(&mut self, events: Arc<Mutex<Events>>, delay_send_message: bool) {
+        // Clearing body parts wich does not selected currently
+        let mut request_data = self.draft.clone();
+        match self.visible_body {
+            RequestBodyDetails::Raw => {
+                request_data.body.binary_path = "".into();
+                request_data.body.form_data = vec![];
+            }
+            RequestBodyDetails::FormData => {
+                request_data.body.binary_path = "".into();
+                request_data.body.raw = CountedText::default();
+            }
+            RequestBodyDetails::Binary => {
+                request_data.body.form_data = vec![];
+                request_data.body.raw = CountedText::default();
+            }
+        }
         self.executor
-            .execute(&self.draft, &self.setup, delay_send_message, events);
+            .execute(&request_data, delay_send_message, events);
     }
 
     /// Stop Executor, also drop execution in progress
@@ -136,6 +170,7 @@ impl Request {
             || self
                 .draft
                 .body
+                .raw
                 .message
                 .to_lowercase()
                 .contains(&filter.to_lowercase())
@@ -205,6 +240,13 @@ pub enum RequestDetails {
     QueryParams,
     Message,
     Setup,
+}
+
+/// Request details currently shown on UI
+#[derive(Debug, Clone, PartialEq)]
+pub enum RequestBodyDetails {
+    Raw,
+    FormData,
     Binary,
 }
 
@@ -215,6 +257,7 @@ pub enum RequestHeaders {
     Custom,
 }
 
+/// Default Headers for WS - cant be changed!
 pub fn default_ws_headers() -> Vec<Header> {
     vec![
         Header {
@@ -347,7 +390,7 @@ impl Default for RequestWsSetup {
 pub struct RequestHttpSetup {
     pub http_version: HttpVersion,
     pub use_cookies: bool,
-    pub use_redicrects: bool,
+    pub use_redirects: bool,
     pub redirects_amount: String,
 }
 
@@ -356,7 +399,7 @@ impl Default for RequestHttpSetup {
         Self {
             http_version: HttpVersion::AUTO,
             use_cookies: true,
-            use_redicrects: true,
+            use_redirects: true,
             redirects_amount: "9".into(),
         }
     }
@@ -372,7 +415,7 @@ impl From<&RequestHttpSetupSettings> for RequestHttpSetup {
         Self {
             http_version,
             use_cookies: value.use_cookies,
-            use_redicrects: value.use_redicrects,
+            use_redirects: value.use_redirects,
             redirects_amount: value.redirects_amount.to_string(),
         }
     }

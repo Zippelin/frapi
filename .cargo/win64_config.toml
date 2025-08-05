@@ -1,0 +1,8 @@
+[env]
+CARGO_TARGET_DIR = {value = "C:/rust-project/cargo_targets/frapi/", force = true}
+
+[build]
+target-dir = "C:/rust-project/cargo_targets/frapi/"
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

@@ -7,7 +7,9 @@ use egui::{
 };
 
 use crate::{
-    settings::{Method, Protocol},
+    settings::main_settings::entity::request_settings::{
+        method_settigns::Method, protocol_settings::Protocol,
+    },
     states::{main_page::entity::Entity, States, Style},
     ui::icons::Icon,
 };
@@ -29,75 +31,112 @@ impl LeftPanel {
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     // Group of Add new Entity buttons adn filter
-                    ui.group(|ui| {
-                        ui.style_mut().spacing.button_padding = vec2(10., 10.);
-                        ui.menu_button("New", |ui| {
+                    Frame::new()
+                        .fill(states.style.color_secondary())
+                        .inner_margin(Margin::same(5))
+                        .show(ui, |ui| {
                             ui.style_mut().spacing.button_padding = vec2(10., 10.);
-
-                            if ui.button("Request").clicked() {
-                                let (collection_idx, request_idx) = states.main_page.new_request();
-                                if let Some(c_idx) = collection_idx {
-                                    states.main_page.set_collection_fold_state(c_idx, false);
-                                };
+                            ui.menu_button(
                                 states
-                                    .main_page
-                                    .selected_entity
-                                    .select_request(collection_idx, request_idx);
-                                states.main_page.drop_filter();
+                                    .style
+                                    .fonts
+                                    .menu_text("New")
+                                    .color(states.style.color_lighter()),
+                                |ui| {
+                                    ui.style_mut().spacing.button_padding = vec2(10., 10.);
+
+                                    if ui
+                                        .button(
+                                            states
+                                                .style
+                                                .fonts
+                                                .menu_text("Request")
+                                                .color(states.style.color_main()),
+                                        )
+                                        .clicked()
+                                    {
+                                        let (collection_idx, request_idx) =
+                                            states.main_page.new_request();
+                                        if let Some(c_idx) = collection_idx {
+                                            states
+                                                .main_page
+                                                .set_collection_fold_state(c_idx, false);
+                                        };
+                                        states
+                                            .main_page
+                                            .selected_entity
+                                            .select_request(collection_idx, request_idx);
+                                        states.main_page.drop_filter();
+                                    };
+
+                                    if ui
+                                        .button(
+                                            states
+                                                .style
+                                                .fonts
+                                                .menu_text("Collection")
+                                                .color(states.style.color_main()),
+                                        )
+                                        .clicked()
+                                    {
+                                        let new_collection_idx = states.main_page.new_collection();
+                                        states
+                                            .main_page
+                                            .selected_entity
+                                            .select_collection(new_collection_idx);
+                                        states.main_page.drop_filter();
+                                    };
+                                },
+                            );
+
+                            ui.style_mut().visuals.widgets.active.corner_radius =
+                                CornerRadius::ZERO;
+                            ui.style_mut().visuals.widgets.inactive.corner_radius =
+                                CornerRadius::ZERO;
+                            ui.style_mut().visuals.widgets.hovered.corner_radius =
+                                CornerRadius::ZERO;
+                            ui.style_mut().visuals.widgets.noninteractive.corner_radius =
+                                CornerRadius::ZERO;
+
+                            let filter_textedit =
+                                TextEdit::singleline(&mut states.main_page.filter_text)
+                                    .hint_text(WidgetText::RichText(Arc::new(
+                                        RichText::new("search")
+                                            .color(states.style.color_secondary())
+                                            .monospace()
+                                            .size(15.),
+                                    )))
+                                    .text_color(states.style.color_main())
+                                    .char_limit(50)
+                                    .font(FontSelection::FontId(states.style.fonts.header2()))
+                                    .desired_width(ui.available_width() - 30.);
+
+                            ui.style_mut().spacing.item_spacing = vec2(1., 0.);
+
+                            if ui.add(filter_textedit).lost_focus()
+                                && ctx.input(|i| i.key_pressed(Key::Enter))
+                            {
+                                states.main_page.apply_filter();
                             };
 
-                            if ui.button("Collection").clicked() {
-                                let new_collection_idx = states.main_page.new_collection();
-                                states
-                                    .main_page
-                                    .selected_entity
-                                    .select_collection(new_collection_idx);
+                            ui.style_mut().spacing.button_padding = vec2(6., 4.);
+
+                            if ui
+                                .add(
+                                    Button::new("X")
+                                        .corner_radius(CornerRadius::ZERO)
+                                        .fill(states.style.color_light())
+                                        .stroke(Stroke::default()),
+                                )
+                                .clicked()
+                            {
                                 states.main_page.drop_filter();
-                            };
+                            }
                         });
-
-                        ui.style_mut().visuals.widgets.active.corner_radius = CornerRadius::ZERO;
-                        ui.style_mut().visuals.widgets.inactive.corner_radius = CornerRadius::ZERO;
-                        ui.style_mut().visuals.widgets.hovered.corner_radius = CornerRadius::ZERO;
-                        ui.style_mut().visuals.widgets.noninteractive.corner_radius =
-                            CornerRadius::ZERO;
-
-                        let filter_textedit =
-                            TextEdit::singleline(&mut states.main_page.filter_text)
-                                .hint_text(WidgetText::RichText(Arc::new(
-                                    RichText::new("search")
-                                        .color(states.style.color_secondary())
-                                        .monospace()
-                                        .size(15.),
-                                )))
-                                .text_color(states.style.color_main())
-                                .char_limit(50)
-                                .font(FontSelection::FontId(states.style.fonts.header2()))
-                                .desired_width(ui.available_width() - 29.);
-
-                        ui.style_mut().spacing.item_spacing = vec2(1., 0.);
-
-                        if ui.add(filter_textedit).lost_focus()
-                            && ctx.input(|i| i.key_pressed(Key::Enter))
-                        {
-                            states.main_page.apply_filter();
-                        };
-
-                        ui.style_mut().spacing.button_padding = vec2(6., 4.);
-
-                        if ui
-                            .add(
-                                Button::new("X")
-                                    .corner_radius(CornerRadius::ZERO)
-                                    .fill(states.style.color_light())
-                                    .stroke(Stroke::default()),
-                            )
-                            .clicked()
-                        {
-                            states.main_page.drop_filter();
-                        }
-                    });
                 });
+
+                ui.separator();
+
                 ui.add_space(5.);
 
                 // Entities list

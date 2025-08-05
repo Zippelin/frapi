@@ -6,7 +6,7 @@
     "entities": [
       {
         "REQUEST": {
-          "id": "559b088d-4a7a-481e-8b59-229c7ee864b3",
+          "id": "ef76c293-3b2c-4be1-b391-bc0ea0ac7960",
           "name": "request to firebase",
           "protocol": "HTTPS",
           "method": "GET",
@@ -25,27 +25,30 @@
               "value": true
             }
           ],
-          "body": "",
+          "body": {
+            "raw": "",
+            "form_data": [],
+            "binary_path": ""
+          },
           "message": "",
           "setup": {
             "HTTP": {
               "http_version": "AUTO",
               "use_cookies": true,
-              "use_redicrects": true,
+              "use_redirects": true,
               "redirects_amount": 9
             }
-          },
-          "binary_path": ""
+          }
         }
       },
       {
         "COLLECTION": {
-          "id": "55896a81-da30-49ae-bcee-b3409e25e45d",
+          "id": "64e41f4b-f4c2-43da-bfa6-0df795778003",
           "name": "Collection 1",
           "description": "Description for Collection 1",
           "requests": [
             {
-              "id": "a8a962da-ef73-4c6b-a853-0cc0ec962adc",
+              "id": "361ca206-3c94-4055-bb82-773b5fd56292",
               "name": "request to yandex",
               "protocol": "HTTPS",
               "method": "GET",
@@ -64,20 +67,23 @@
                   "value": true
                 }
               ],
-              "body": "",
+              "body": {
+                "raw": "",
+                "form_data": [],
+                "binary_path": ""
+              },
               "message": "",
               "setup": {
                 "HTTP": {
                   "http_version": "AUTO",
                   "use_cookies": true,
-                  "use_redicrects": true,
+                  "use_redirects": true,
                   "redirects_amount": 9
                 }
-              },
-              "binary_path": ""
+              }
             },
             {
-              "id": "423fecb4-f3c8-45f1-ae60-e853a4b5c21e",
+              "id": "8c7c0978-32ca-4727-aa19-749d9d711e87",
               "name": "request to google",
               "protocol": "HTTPS",
               "method": "GET",
@@ -96,29 +102,32 @@
                   "value": true
                 }
               ],
-              "body": "",
+              "body": {
+                "raw": "",
+                "form_data": [],
+                "binary_path": ""
+              },
               "message": "",
               "setup": {
                 "HTTP": {
                   "http_version": "AUTO",
                   "use_cookies": true,
-                  "use_redicrects": true,
+                  "use_redirects": true,
                   "redirects_amount": 9
                 }
-              },
-              "binary_path": ""
+              }
             }
           ]
         }
       },
       {
         "COLLECTION": {
-          "id": "0036889d-970c-43c7-8d4f-20155e640004",
+          "id": "b3361463-9a9e-4785-8515-9fda1407aaca",
           "name": "Collection 2",
           "description": "Description for Collection 2",
           "requests": [
             {
-              "id": "81253886-5b0d-41fb-a170-72051748d5b7",
+              "id": "8bb5a109-4183-472c-beed-943952aff9b4",
               "name": "request to microsoft",
               "protocol": "HTTPS",
               "method": "GET",
@@ -137,24 +146,27 @@
                   "value": true
                 }
               ],
-              "body": "",
+              "body": {
+                "raw": "",
+                "form_data": [],
+                "binary_path": ""
+              },
               "message": "",
               "setup": {
                 "HTTP": {
                   "http_version": "AUTO",
                   "use_cookies": true,
-                  "use_redicrects": true,
+                  "use_redirects": true,
                   "redirects_amount": 9
                 }
-              },
-              "binary_path": ""
+              }
             }
           ]
         }
       },
       {
         "REQUEST": {
-          "id": "808875f3-34a6-4221-8930-1430b9aa0ea0",
+          "id": "f8d2a4bf-731d-43d4-bc00-2d59463d9c4c",
           "name": "request to mail",
           "protocol": "HTTPS",
           "method": "GET",
@@ -173,20 +185,32 @@
               "value": true
             }
           ],
-          "body": "",
+          "body": {
+            "raw": "",
+            "form_data": [],
+            "binary_path": ""
+          },
           "message": "",
           "setup": {
             "HTTP": {
               "http_version": "AUTO",
               "use_cookies": true,
-              "use_redicrects": true,
+              "use_redirects": true,
               "redirects_amount": 9
             }
-          },
-          "binary_path": ""
+          }
         }
       }
     ]
   },
-  "options": {}
+  "options": {
+    "window_size": [
+      1304.5,
+      897.0
+    ],
+    "window_position": [
+      2148.0,
+      102.0
+    ]
+  }
 }

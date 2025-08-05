@@ -1,6 +1,16 @@
+use std::fmt::Display;
+
 use crate::{
-    settings::{Method, Protocol, RequestSettings},
-    states::main_page::generics::{CountedText, Header},
+    settings::main_settings::entity::request_settings::{
+        body_settings::{FormFieldTypeSettings, RequestBodySettigns},
+        method_settigns::Method,
+        protocol_settings::Protocol,
+        RequestSettings,
+    },
+    states::main_page::{
+        generics::{CountedText, Header},
+        request::RequestSetup,
+    },
 };
 
 /// Request data representation
@@ -11,13 +21,13 @@ pub struct RequestData {
     pub method: Method,
     pub uri: String,
     pub headers: Vec<Header>,
-    pub body: CountedText,
+    pub body: RequestBody,
     pub message: CountedText,
-    /// List og qeury params.
+    /// List of query params.
     /// Constructed on fly, dont store in settings
     pub query_params: Vec<Header>,
-    /// Path to binary file
-    pub binary_path: String,
+    /// Settings for request
+    pub setup: RequestSetup,
 }
 
 /// From Settigns -> State
@@ -43,9 +53,6 @@ impl From<&RequestSettings> for RequestData {
             };
         }
 
-        let mut body = CountedText::default();
-        body.set(value.body.clone());
-
         let mut message = CountedText::default();
         message.set(value.message.clone());
 
@@ -55,10 +62,10 @@ impl From<&RequestSettings> for RequestData {
             method: value.method.clone(),
             uri: value.uri.clone(),
             headers,
-            body,
+            body: RequestBody::from(&value.body),
             query_params: vec![],
             message,
-            binary_path: value.binary_path.clone(),
+            setup: RequestSetup::from(&value.setup),
         };
         data.parse_query_params();
         data
@@ -73,10 +80,10 @@ impl RequestData {
             method: Method::GET,
             uri: "".into(),
             headers: vec![],
-            body: CountedText::default(),
+            body: RequestBody::default(),
             query_params: vec![],
             message: CountedText::default(),
-            binary_path: "".into(),
+            setup: RequestSetup::default(),
         }
     }
     /// Copy from other Self.
@@ -88,6 +95,7 @@ impl RequestData {
         self.uri = other_request.uri.clone();
         self.body = other_request.body.clone();
         self.message = other_request.message.clone();
+        self.setup = other_request.setup.clone();
 
         self.headers = other_request
             .headers
@@ -200,5 +208,87 @@ impl RequestData {
             return true;
         }
         false
+    }
+}
+
+/// Request Form Body data Fied Type
+#[derive(Debug, Clone, PartialEq)]
+pub enum FormFieldType {
+    Text,
+    File,
+}
+
+impl Display for FormFieldType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FormFieldType::Text => f.write_str("Text"),
+            FormFieldType::File => f.write_str("File"),
+        }
+    }
+}
+
+/// Request Form Body data
+#[derive(Debug, Clone)]
+pub struct BodyFromData {
+    pub key: String,
+    pub value: String,
+    pub field_type: FormFieldType,
+}
+
+/// Body representation for request
+#[derive(Debug, Clone)]
+pub struct RequestBody {
+    pub raw: CountedText,
+    pub form_data: Vec<BodyFromData>,
+    pub binary_path: String,
+}
+
+impl Default for RequestBody {
+    fn default() -> Self {
+        Self {
+            raw: CountedText::default(),
+            form_data: vec![],
+            binary_path: "".into(),
+        }
+    }
+}
+
+impl From<&RequestBodySettigns> for RequestBody {
+    fn from(value: &RequestBodySettigns) -> Self {
+        let mut form_data = vec![];
+
+        for data in &value.form_data {
+            // Remove redundant quotes from only string-like values
+            match data.value.as_str() {
+                Some(val) => {
+                    form_data.push(BodyFromData {
+                        key: data.key.clone(),
+                        value: val.to_string(),
+                        field_type: match data.field_type {
+                            FormFieldTypeSettings::Text => FormFieldType::Text,
+                            FormFieldTypeSettings::File => FormFieldType::File,
+                        },
+                    });
+                }
+                None => {
+                    form_data.push(BodyFromData {
+                        key: data.key.clone(),
+                        value: data.value.to_string(),
+                        field_type: match data.field_type {
+                            FormFieldTypeSettings::Text => FormFieldType::Text,
+                            FormFieldTypeSettings::File => FormFieldType::File,
+                        },
+                    });
+                }
+            };
+        }
+
+        let mut raw = CountedText::default();
+        raw.set(value.raw.clone());
+        Self {
+            raw,
+            form_data,
+            binary_path: value.binary_path.clone(),
+        }
     }
 }

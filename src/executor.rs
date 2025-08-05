@@ -1,15 +1,17 @@
 /// Executro engine for reqeusting or keep sessions for requests
 use std::{
     fmt::Debug,
+    fs,
     sync::{Arc, Mutex},
     time::Duration,
 };
 
+use egui::ahash::HashMap;
 use tokio_tungstenite::tungstenite::Message as TokioMessage;
 
 use futures::{executor::block_on, SinkExt, StreamExt, TryStreamExt};
 use reqwest::{
-    header::{HeaderName, HeaderValue},
+    header::{HeaderName, HeaderValue, CONTENT_TYPE},
     redirect::Policy,
     Client,
 };
@@ -21,13 +23,15 @@ use tokio::{
 use tokio_tungstenite::connect_async;
 
 use crate::{
-    settings::{Method, Protocol},
+    settings::main_settings::entity::request_settings::{
+        method_settigns::Method, protocol_settings::Protocol,
+    },
     states::{
         main_page::{
             generics::Header,
             request::{
-                request_data::RequestData, HttpVersion, RequestHttpSetup, RequestSetup,
-                RequestWsSetup,
+                request_data::{RequestBody, RequestData},
+                HttpVersion, RequestHttpSetup, RequestWsSetup,
             },
             response::Response,
         },
@@ -137,9 +141,8 @@ pub struct CommandExecute {
     pub protocol: Protocol,
     pub method: Method,
     pub headers: Vec<Header>,
-    pub body: String,
+    pub body: RequestBody,
     pub message: String,
-    pub binary_path: String,
 }
 
 /// From RequestData -> command to execute on executor
@@ -158,14 +161,11 @@ impl From<&RequestData> for CommandExecute {
             protocol: value.protocol.clone(),
             method: value.method.clone(),
             headers,
-            body: value.body.message.clone(),
+            body: value.body.clone(),
             message: value.message.message.clone(),
-            binary_path: value.binary_path.clone(),
         }
     }
 }
-
-// TODO: add events and errors or warn on bad responses
 
 /// Executor engine
 #[derive(Debug, Clone)]
@@ -194,7 +194,6 @@ impl Executor {
     pub fn execute(
         &mut self,
         data: &RequestData,
-        setup: &RequestSetup,
         connection_only: bool,
         events: Arc<Mutex<Events>>,
     ) {
@@ -232,7 +231,7 @@ impl Executor {
                 .event_info(&format!("Detected free executor, sending http request..."));
             *self.state.lock().unwrap() = State::BUSY;
 
-            let setup = match setup.http() {
+            let setup = match data.setup.http() {
                 Some(val) => val,
                 None => &RequestHttpSetup::default(),
             };
@@ -258,7 +257,7 @@ impl Executor {
                 };
 
                 // TODO: add settings to WS connection
-                let setup = match setup.ws() {
+                let setup = match data.setup.ws() {
                     Some(val) => val,
                     None => &RequestWsSetup::default(),
                 };
@@ -306,8 +305,6 @@ impl Executor {
         ));
     }
 
-    // TODO: add autoredirect settings
-    // TODO: add headers response etc...
     /// Thread for http requests
     async fn http_thread(
         message: Command,
@@ -327,7 +324,7 @@ impl Executor {
                         builder = builder.cookie_store(true);
                     }
 
-                    if setup.use_redicrects {
+                    if setup.use_redirects {
                         builder = builder.redirect(Policy::limited(
                             setup.redirects_amount.parse::<usize>().unwrap(),
                         ));
@@ -347,15 +344,41 @@ impl Executor {
 
                     let mut result = client.request(command_execute.method.into(), uri.clone());
 
+                    // Settings BODY part
+                    if command_execute.body.raw.rows > 0 {
+                        result = result.body(command_execute.body.raw.message);
+                    } else if command_execute.body.binary_path.len() > 0 {
+                        let file = fs::read(command_execute.body.binary_path.clone());
+                        match file {
+                            Ok(f) => {
+                                let content_type =
+                                    mime_guess::from_path(command_execute.body.binary_path)
+                                        .first_or_octet_stream()
+                                        .to_string();
+                                result = result.body(f).header(CONTENT_TYPE, content_type);
+                            }
+                            Err(err) => {
+                                events.lock().unwrap().event_error(&format!(
+                                    "Error: Could not read file: {}; Error: {err}",
+                                    command_execute.body.binary_path,
+                                ));
+                                return;
+                            }
+                        };
+                    } else {
+                        let form: HashMap<String, String> = command_execute
+                            .body
+                            .form_data
+                            .iter()
+                            .map(|f| (f.key.clone(), f.value.clone()))
+                            .collect();
+
+                        result = result.form(&form);
+                    };
+
                     for header in command_execute.headers {
                         result = result.header(header.key, header.value);
                     }
-
-                    if command_execute.body.len() > 0 {
-                        result = result.body(command_execute.body);
-                    }
-
-                    if command_execute.binary_path.len() > 0 {}
 
                     let result = result.send().await;
 
@@ -588,7 +611,7 @@ impl Executor {
                                                 events
                                                     .lock()
                                                     .unwrap()
-                                                    .event_error(&format!("Error: Could not send message to WS channel. Message: {}. Error: {}",command_execute.body.clone(), err));
+                                                    .event_error(&format!("Error: Could not send message to WS channel. Message: {}. Error: {}",command_execute.message.clone(), err));
                                             }
                                         };
                                     }

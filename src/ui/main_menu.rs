@@ -38,66 +38,160 @@ impl MainMenu {
                     // Убираем скругление для панели меню
                     ui.ctx().set_visuals(Visuals {
                         menu_corner_radius: CornerRadius::ZERO,
-                        window_fill: states.style.color_secondary(),
+                        window_fill: states.style.color_light(),
                         extreme_bg_color: states.style.color_light(),
                         ..ui.visuals().clone()
                     });
 
-                    ui.menu_button("File", |ui| {
-                        ui.style_mut().spacing.button_padding = vec2(10., 10.);
-                        if ui
-                            .button("Save All                      Ctrl+Shift+S")
-                            .clicked()
-                        {
-                            states.save(None);
-                        };
-                        ui.style_mut().spacing.button_padding = vec2(10., 10.);
-                        if ui.button("Save Selected           Ctrl+S").clicked() {
-                            states.save_selected(None);
-                        };
-
-                        ui.menu_button("Export / Import", |ui| {
+                    ui.menu_button(
+                        states
+                            .style
+                            .fonts
+                            .menu_text("File")
+                            .color(states.style.color_main()),
+                        |ui| {
                             ui.style_mut().spacing.button_padding = vec2(10., 10.);
-                            if ui.button("Export Settings To...").clicked() {
-                                self.folders_picker();
+                            if ui
+                                .button(
+                                    states
+                                        .style
+                                        .fonts
+                                        .menu_text("Save All               Ctrl+Shift+S")
+                                        .color(states.style.color_main()),
+                                )
+                                .clicked()
+                            {
+                                states.save(None);
+                            };
+                            ui.style_mut().spacing.button_padding = vec2(10., 10.);
+                            if ui
+                                .button(
+                                    states
+                                        .style
+                                        .fonts
+                                        .menu_text("Save Selected          Ctrl+S")
+                                        .color(states.style.color_main()),
+                                )
+                                .clicked()
+                            {
+                                states.save_selected(None);
                             };
 
-                            if ui.button("Import Settings From...").clicked() {
-                                self.file_picker();
+                            ui.menu_button(
+                                states
+                                    .style
+                                    .fonts
+                                    .menu_text("Export / Import")
+                                    .color(states.style.color_main()),
+                                |ui| {
+                                    ui.style_mut().spacing.button_padding = vec2(10., 10.);
+                                    if ui
+                                        .button(
+                                            states
+                                                .style
+                                                .fonts
+                                                .menu_text("Export Settings To...")
+                                                .color(states.style.color_main()),
+                                        )
+                                        .clicked()
+                                    {
+                                        self.folders_picker();
+                                    };
+
+                                    if ui
+                                        .button(
+                                            states
+                                                .style
+                                                .fonts
+                                                .menu_text("Import Settings From...")
+                                                .color(states.style.color_main()),
+                                        )
+                                        .clicked()
+                                    {
+                                        self.file_picker();
+                                    };
+                                },
+                            );
+
+                            if self.export_folder_path.is_some() {
+                                states.save(self.export_folder_path.take());
                             };
-                        });
 
-                        if self.export_folder_path.is_some() {
-                            states.save(self.export_folder_path.take());
-                        };
+                            if self.import_file_path.is_some() {
+                                states.load(self.import_file_path.take());
+                            };
 
-                        if self.import_file_path.is_some() {
-                            states.load(self.import_file_path.take());
-                        };
+                            ui.separator();
 
-                        ui.separator();
+                            if ui
+                                .button(
+                                    states
+                                        .style
+                                        .fonts
+                                        .menu_text("Exit             ")
+                                        .color(states.style.color_main()),
+                                )
+                                .clicked()
+                            {
+                                exit(0)
+                            };
+                        },
+                    );
 
-                        if ui.button("Exit             ").clicked() {
-                            exit(0)
-                        };
-                    });
+                    ui.menu_button(
+                        states
+                            .style
+                            .fonts
+                            .menu_text("Options")
+                            .color(states.style.color_main()),
+                        |ui| {
+                            ui.style_mut().spacing.button_padding = vec2(10., 10.);
+                            let _ = ui.button(
+                                states
+                                    .style
+                                    .fonts
+                                    .menu_text("Settings")
+                                    .color(states.style.color_main()),
+                            );
 
-                    ui.menu_button("Options", |ui| {
-                        ui.style_mut().spacing.button_padding = vec2(10., 10.);
-                        let _ = ui.button("Settings             ");
+                            if ui
+                                .button(
+                                    states
+                                        .style
+                                        .fonts
+                                        .menu_text("Toggle Right panel  ")
+                                        .color(states.style.color_main()),
+                                )
+                                .clicked()
+                            {
+                                states.main_page.right_panel_is_visible =
+                                    !states.main_page.right_panel_is_visible;
+                            };
+                        },
+                    );
 
-                        if ui.button("Toggle Right panel             ").clicked() {
-                            states.main_page.right_panel_is_visible =
-                                !states.main_page.right_panel_is_visible;
-                        };
-                    });
-
-                    ui.menu_button("About", |ui| {
-                        ui.style_mut().spacing.button_padding = vec2(10., 10.);
-                        if ui.button("About Frapi             ").clicked() {
-                            self.modal_about_is_visilbe = true;
-                        }
-                    });
+                    ui.menu_button(
+                        states
+                            .style
+                            .fonts
+                            .menu_text("About")
+                            .color(states.style.color_main()),
+                        |ui| {
+                            ui.style_mut().spacing.button_padding = vec2(10., 10.);
+                            if ui
+                                .button(
+                                    states
+                                        .style
+                                        .fonts
+                                        .menu_text("About Frapi   ")
+                                        .color(states.style.color_main()),
+                                )
+                                .clicked()
+                            {
+                                self.modal_about_is_visilbe = true;
+                            }
+                        },
+                    );
                 });
             });
         self.about_window(ctx, states);

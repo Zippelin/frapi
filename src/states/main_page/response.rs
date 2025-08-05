@@ -69,23 +69,20 @@ impl Response {
                         code,
                         is_folded: true,
                     }),
-                    Err(err) => {
-                        println!("err: {}", err);
-                        Err((
-                            Self {
-                                time: Local::now(),
-                                data: ResponseData::new(
-                                    "Error during text receiving".into(),
-                                    vec![],
-                                    "".into(),
-                                ),
-                                selected_view: ResponseView::RAW,
-                                code,
-                                is_folded: true,
-                            },
-                            format!("Error during text receiving. Error: {}", err),
-                        ))
-                    }
+                    Err(err) => Err((
+                        Self {
+                            time: Local::now(),
+                            data: ResponseData::new(
+                                "Error during text receiving".into(),
+                                vec![],
+                                "".into(),
+                            ),
+                            selected_view: ResponseView::RAW,
+                            code,
+                            is_folded: true,
+                        },
+                        format!("Error during text receiving. Error: {}", err),
+                    )),
                 }
             }
 

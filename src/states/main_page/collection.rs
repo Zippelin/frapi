@@ -1,4 +1,7 @@
-use crate::{settings::CollectionSettings, states::main_page::request::Request};
+use crate::{
+    settings::main_settings::entity::collection_settings::CollectionSettings,
+    states::main_page::request::Request,
+};
 
 /// Collection Entity representation
 #[derive(Debug, Clone)]

@@ -1,1 +1,4 @@
 /target
+/builds/build*
+/builds/*/*/cache.json
+docs/img/Thumbs.db

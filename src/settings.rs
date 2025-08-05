@@ -1,4 +1,3 @@
-use core::fmt;
 use std::{
     fs::{File, OpenOptions},
     io::{BufReader, Write},
@@ -6,20 +5,20 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
-use crate::states::{
-    main_page::{
-        collection::Collection as StateCollection,
-        entity::Entity as StateEntity,
-        generics::Header as StateHeader,
-        request::{
-            HttpVersion, Request as StateRequest, RequestHttpSetup, RequestSetup, RequestWsSetup,
-        },
-        MainPage,
+use crate::{
+    settings::{
+        main_settings::MainPageSettings, options_settings::OptionsSettings, ui_settings::UISettings,
     },
-    Options as StateOptions, States, Style, Theme,
+    states::{
+        main_page::request::{HttpVersion, RequestHttpSetup, RequestWsSetup},
+        States,
+    },
 };
+
+pub mod main_settings;
+pub mod options_settings;
+pub mod ui_settings;
 
 fn default_settings_filepath() -> String {
     "cache.json".into()
@@ -30,7 +29,7 @@ fn default_settings_filepath() -> String {
 pub struct Settings {
     pub ui: UISettings,
     pub main_page: MainPageSettings,
-    pub options: Options,
+    pub options: OptionsSettings,
 }
 
 impl Settings {
@@ -134,7 +133,7 @@ impl Settings {
         Self {
             ui: UISettings::default(),
             main_page: MainPageSettings::default(),
-            options: Options::default(),
+            options: OptionsSettings::default(),
         }
     }
 
@@ -189,7 +188,7 @@ impl Settings {
         Self {
             ui: UISettings::from(&value.style),
             main_page: MainPageSettings::from_original(&value.main_page),
-            options: Options::from(&value.options),
+            options: OptionsSettings::from(&value.options),
         }
     }
 }
@@ -202,290 +201,7 @@ impl From<&States> for Settings {
         Self {
             ui: UISettings::from(&value.style),
             main_page: MainPageSettings::from(&value.main_page),
-            options: Options::from(&value.options),
-        }
-    }
-}
-
-// Settings::Options - general settings
-#[derive(Clone, PartialEq, Serialize, Deserialize, Debug, Default)]
-pub struct Options {}
-
-impl From<&StateOptions> for Options {
-    fn from(value: &StateOptions) -> Self {
-        let _ = value;
-        // TODO: add convertions from State-Optiont to Settigns Options
-        Self {}
-    }
-}
-
-impl Options {
-    pub fn default() -> Self {
-        Self {}
-    }
-}
-
-// Settings::Theme - color theme for application
-#[derive(Clone, PartialEq, Serialize, Deserialize, Debug, Default)]
-pub enum UITheme {
-    Light,
-    #[default]
-    Dark,
-}
-
-#[derive(Clone, PartialEq, Serialize, Deserialize, Debug, Default)]
-pub struct UISettings {
-    pub theme: UITheme,
-}
-
-impl From<&Style> for UISettings {
-    fn from(value: &Style) -> Self {
-        let theme = match &value.theme {
-            Theme::Light(_) => UITheme::Light,
-            Theme::Dark(_) => UITheme::Dark,
-        };
-        Self { theme }
-    }
-}
-
-impl UISettings {
-    pub fn default() -> Self {
-        Self {
-            theme: UITheme::Dark,
-        }
-    }
-}
-
-#[derive(Clone, PartialEq, Serialize, Deserialize, Debug, Default)]
-pub struct MainPageSettings {
-    pub entities: Vec<Entity>,
-}
-
-impl From<&MainPage> for MainPageSettings {
-    fn from(value: &MainPage) -> Self {
-        let mut entities = vec![];
-        for state_entity in &value.entities {
-            entities.push(Entity::from(state_entity));
-        }
-        Self { entities }
-    }
-}
-
-impl MainPageSettings {
-    pub fn default() -> Self {
-        Self { entities: vec![] }
-    }
-    pub fn from_original(value: &MainPage) -> Self {
-        let mut entities = vec![];
-        for state_entity in &value.entities {
-            entities.push(Entity::from_original(state_entity));
-        }
-        Self { entities }
-    }
-}
-
-#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
-pub enum Entity {
-    COLLECTION(CollectionSettings),
-    REQUEST(RequestSettings),
-}
-
-impl From<&StateEntity> for Entity {
-    fn from(value: &StateEntity) -> Self {
-        match value {
-            StateEntity::COLLECTION(collection) => {
-                Self::COLLECTION(CollectionSettings::from(collection))
-            }
-            StateEntity::REQUEST(request) => Self::REQUEST(RequestSettings::from(request)),
-        }
-    }
-}
-
-impl Entity {
-    pub fn from_original(value: &StateEntity) -> Self {
-        match value {
-            StateEntity::COLLECTION(collection) => {
-                Self::COLLECTION(CollectionSettings::from_original(collection))
-            }
-            StateEntity::REQUEST(request) => Self::REQUEST(RequestSettings::from_original(request)),
-        }
-    }
-}
-
-#[derive(Clone, PartialEq, Serialize, Deserialize, Debug, Default)]
-pub struct CollectionSettings {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub requests: Vec<RequestSettings>,
-}
-
-impl From<&StateCollection> for CollectionSettings {
-    fn from(value: &StateCollection) -> Self {
-        let requests = value
-            .requests
-            .iter()
-            .map(|val| RequestSettings::from(val))
-            .collect();
-        Self {
-            id: value.id.clone(),
-            name: value.draft.name.clone(),
-            description: value.draft.description.clone(),
-            requests,
-        }
-    }
-}
-
-impl CollectionSettings {
-    pub fn from_original(value: &StateCollection) -> Self {
-        let requests = value
-            .requests
-            .iter()
-            .map(|val| RequestSettings::from(val))
-            .collect();
-        Self {
-            id: value.id.clone(),
-            name: value.original.name.clone(),
-            description: value.original.description.clone(),
-            requests,
-        }
-    }
-}
-
-#[derive(Clone, PartialEq, Serialize, Deserialize, Debug, Default)]
-pub struct RequestSettings {
-    pub id: String,
-    pub name: String,
-    pub protocol: Protocol,
-    pub method: Method,
-    pub uri: String,
-    pub headers: Vec<Header>,
-    pub body: String,
-    pub message: String,
-    pub setup: RequestSetupSettings,
-    pub binary_path: String,
-}
-
-impl From<&StateRequest> for RequestSettings {
-    fn from(value: &StateRequest) -> Self {
-        let headers = value
-            .draft
-            .headers
-            .iter()
-            .map(|val| Header::from(val))
-            .collect();
-        Self {
-            id: value.id.clone(),
-            name: value.draft.name.clone(),
-            protocol: value.draft.protocol.clone(),
-            method: value.draft.method.clone(),
-            uri: value.draft.uri.clone(),
-            headers,
-            body: value.draft.body.message.clone(),
-            message: value.draft.message.message.clone(),
-            setup: RequestSetupSettings::from(&value.setup),
-            binary_path: value.draft.binary_path.clone(),
-        }
-    }
-}
-
-impl RequestSettings {
-    fn from_original(value: &StateRequest) -> Self {
-        let headers = value
-            .original
-            .headers
-            .iter()
-            .map(|val| Header::from(val))
-            .collect();
-        Self {
-            id: value.id.clone(),
-            name: value.original.name.clone(),
-            protocol: value.original.protocol.clone(),
-            method: value.original.method.clone(),
-            uri: value.original.uri.clone(),
-            headers,
-            body: value.original.body.message.clone(),
-            message: value.original.message.message.clone(),
-            setup: RequestSetupSettings::from(&value.setup),
-            binary_path: value.original.binary_path.clone(),
-        }
-    }
-}
-
-#[derive(Clone, PartialEq, Serialize, Deserialize, Debug, Default)]
-pub enum Protocol {
-    HTTP,
-    #[default]
-    HTTPS,
-    WS,
-    WSS,
-}
-
-impl fmt::Display for Protocol {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Protocol::HTTP => write!(f, "HTTP"),
-            Protocol::HTTPS => write!(f, "HTTPS"),
-            Protocol::WS => write!(f, "WS"),
-            Protocol::WSS => write!(f, "WSS"),
-        }
-    }
-}
-
-#[derive(Clone, PartialEq, Serialize, Deserialize, Debug, Default, Copy)]
-#[serde(rename_all = "UPPERCASE")]
-pub enum Method {
-    #[default]
-    GET,
-    POST,
-    PUT,
-    PATCH,
-    DELETE,
-}
-
-impl fmt::Display for Method {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Method::GET => write!(f, "GET"),
-            Method::POST => write!(f, "POST"),
-            Method::PUT => write!(f, "PUT"),
-            Method::PATCH => write!(f, "PATCH"),
-            Method::DELETE => write!(f, "DELETE"),
-        }
-    }
-}
-
-impl Into<reqwest::Method> for Method {
-    fn into(self) -> reqwest::Method {
-        match self {
-            Method::GET => reqwest::Method::GET,
-            Method::POST => reqwest::Method::POST,
-            Method::PUT => reqwest::Method::PUT,
-            Method::PATCH => reqwest::Method::PATCH,
-            // TODO: reqwester dont support this
-            //HTTPMethod::UPDATE => Method::PATCH,
-            Method::DELETE => reqwest::Method::DELETE,
-        }
-    }
-}
-
-#[derive(Clone, PartialEq, Serialize, Deserialize, Debug, Default)]
-pub struct Header {
-    pub key: String,
-    pub value: Value,
-}
-
-impl From<&StateHeader> for Header {
-    fn from(value: &StateHeader) -> Self {
-        match serde_json::from_str(&value.value) {
-            Ok(val) => Self {
-                key: value.key.clone(),
-                value: val,
-            },
-            Err(_) => Self {
-                key: value.key.clone(),
-                value: Value::from(value.value.clone()),
-            },
+            options: OptionsSettings::from(&value.options),
         }
     }
 }
@@ -496,6 +212,19 @@ mod tests {
     use std::{
         fs::OpenOptions,
         io::{BufWriter, Write},
+    };
+
+    use crate::settings::{
+        main_settings::entity::{
+            collection_settings::CollectionSettings,
+            request_settings::{
+                body_settings::RequestBodySettigns, method_settigns::Method,
+                protocol_settings::Protocol, request_setup_settings::RequestSetupSettings, Header,
+                RequestSettings,
+            },
+            Entity,
+        },
+        ui_settings::UITheme,
     };
 
     use super::*;
@@ -540,10 +269,9 @@ mod tests {
                 header_3.clone(),
                 header_4.clone(),
             ],
-            body: "".into(),
+            body: RequestBodySettigns::default(),
             message: "".into(),
             setup: RequestSetupSettings::http(),
-            binary_path: "".into(),
         };
 
         let request_1 = RequestSettings {
@@ -558,10 +286,9 @@ mod tests {
                 header_3.clone(),
                 header_4.clone(),
             ],
-            body: "".into(),
+            body: RequestBodySettigns::default(),
             message: "".into(),
             setup: RequestSetupSettings::http(),
-            binary_path: "".into(),
         };
 
         let request_2 = RequestSettings {
@@ -576,10 +303,9 @@ mod tests {
                 header_3.clone(),
                 header_4.clone(),
             ],
-            body: "".into(),
+            body: RequestBodySettigns::default(),
             message: "".into(),
             setup: RequestSetupSettings::http(),
-            binary_path: "".into(),
         };
 
         let collection_1 = CollectionSettings {
@@ -601,10 +327,9 @@ mod tests {
                 header_3.clone(),
                 header_4.clone(),
             ],
-            body: "".into(),
+            body: RequestBodySettigns::default(),
             message: "".into(),
             setup: RequestSetupSettings::http(),
-            binary_path: "".into(),
         };
 
         let collection_2 = CollectionSettings {
@@ -626,10 +351,9 @@ mod tests {
                 header_3.clone(),
                 header_4.clone(),
             ],
-            body: "".into(),
+            body: RequestBodySettigns::default(),
             message: "".into(),
             setup: RequestSetupSettings::http(),
-            binary_path: "".into(),
         };
 
         let main_page = MainPageSettings {
@@ -641,7 +365,10 @@ mod tests {
             ],
         };
 
-        let options = Options {};
+        let options = OptionsSettings {
+            window_size: (800., 600.),
+            window_position: None,
+        };
 
         let application = Settings {
             ui: ui_settings,
@@ -675,47 +402,12 @@ pub enum HttpVersionSetting {
     HTTPv2,
 }
 
-/// Settings to make reqeust
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum RequestSetupSettings {
-    HTTP(RequestHttpSetupSettings),
-    WS(RequestWsSetupSettings),
-}
-
-impl Default for RequestSetupSettings {
-    fn default() -> Self {
-        Self::HTTP(RequestHttpSetupSettings::default())
-    }
-}
-
-impl From<&RequestSetup> for RequestSetupSettings {
-    fn from(value: &RequestSetup) -> Self {
-        match value {
-            RequestSetup::HTTP(request_http_setup) => {
-                Self::HTTP(RequestHttpSetupSettings::from(request_http_setup))
-            }
-            RequestSetup::WS(request_ws_setup) => {
-                Self::WS(RequestWsSetupSettings::from(request_ws_setup))
-            }
-        }
-    }
-}
-
-impl RequestSetupSettings {
-    pub fn http() -> Self {
-        Self::HTTP(RequestHttpSetupSettings::default())
-    }
-    pub fn ws() -> Self {
-        Self::WS(RequestWsSetupSettings::default())
-    }
-}
-
 /// Settings to make http reqeust
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RequestHttpSetupSettings {
     pub http_version: HttpVersionSetting,
     pub use_cookies: bool,
-    pub use_redicrects: bool,
+    pub use_redirects: bool,
     pub redirects_amount: usize,
 }
 
@@ -724,7 +416,7 @@ impl Default for RequestHttpSetupSettings {
         Self {
             http_version: HttpVersionSetting::AUTO,
             use_cookies: true,
-            use_redicrects: true,
+            use_redirects: true,
             redirects_amount: 9,
         }
     }
@@ -740,7 +432,7 @@ impl From<&RequestHttpSetup> for RequestHttpSetupSettings {
         Self {
             http_version,
             use_cookies: value.use_cookies,
-            use_redicrects: value.use_redicrects,
+            use_redirects: value.use_redirects,
             redirects_amount: value.redirects_amount.parse::<usize>().unwrap(),
         }
     }

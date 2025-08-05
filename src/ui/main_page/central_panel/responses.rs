@@ -6,7 +6,7 @@ use egui::{
 };
 
 use crate::{
-    settings::Protocol,
+    settings::main_settings::entity::request_settings::protocol_settings::Protocol,
     states::{
         main_page::response::{Response, ResponseView},
         States, Style,
@@ -51,8 +51,17 @@ impl ResponsesListPanel {
 
                 let mut responses = responses.unwrap();
 
-                // TODO: add clear all responses
                 ui.with_layout(Layout::top_down_justified(Align::LEFT), |ui| {
+                    ui.group(|ui| {
+                        ui.with_layout(Layout::top_down_justified(Align::RIGHT), |ui| {
+                            ui.horizontal(|ui| {
+                                if ui.button("Clear all").clicked() && responses.len() > 0 {
+                                    responses.clear();
+                                }
+                            })
+                        });
+                    });
+
                     ScrollArea::vertical()
                         .max_height(ui.available_height() - 10.)
                         .show(ui, |ui| {
