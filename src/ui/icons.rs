@@ -13,4 +13,7 @@ impl Icon {
     pub fn delete() -> String {
         "✖".into()
     }
+    pub fn list() -> String {
+        "☰".into()
+    }
 }

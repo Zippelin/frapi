@@ -20,6 +20,42 @@ pub mod request;
 pub mod response;
 pub mod selected_entity;
 
+/// Types of right panel
+#[derive(Debug, Clone, PartialEq)]
+pub enum RightPanelType {
+    EVENTS,
+}
+
+/// State of right panel bassed on user interraction
+#[derive(Debug, Clone)]
+pub struct RightPanel {
+    pub is_visible: bool,
+    pub panel_type: RightPanelType,
+}
+
+impl Default for RightPanel {
+    fn default() -> Self {
+        Self {
+            is_visible: false,
+            panel_type: RightPanelType::EVENTS,
+        }
+    }
+}
+
+impl RightPanel {
+    pub fn toggle(&mut self) {
+        self.is_visible = !self.is_visible;
+    }
+
+    pub fn toggle_events(&mut self) {
+        if self.panel_type == RightPanelType::EVENTS {
+            self.is_visible = !self.is_visible;
+        } else {
+            self.panel_type = RightPanelType::EVENTS;
+        }
+    }
+}
+
 /// Request move target - used when need to transfer request between collections
 #[derive(Debug, Clone)]
 pub struct RequestMoveTarget {
@@ -63,7 +99,7 @@ pub struct MainPage {
     /// Styles and colors for UI theme
     pub style: Style,
     /// Visible or not right sided panel
-    pub right_panel_is_visible: bool,
+    pub right_panel: RightPanel,
 }
 
 /// From Settings -> State
@@ -81,7 +117,7 @@ impl From<&Settings> for MainPage {
             filter_text: "".into(),
             request_move_target: RequestMoveTarget::new(),
             deletion_entity: SelectedEntity::new(),
-            right_panel_is_visible: false,
+            right_panel: RightPanel::default(),
         }
     }
 }
