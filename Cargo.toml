@@ -2,6 +2,7 @@
 name = "frapi"
 version = "0.1.0"
 edition = "2021"
+build = "build.rs"
 
 [dependencies]
 eframe = "0.32"
@@ -22,3 +23,10 @@ version = "1.17.0"
 features = [
     "v4",
 ]
+
+[build-dependencies]
+winres = "0.1"
+
+[package.metadata.winres]
+ProductName = "FrAPI - Free API"
+LegalCopyright = "©2025 FrAPI Team"

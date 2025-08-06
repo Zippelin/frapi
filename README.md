@@ -28,14 +28,33 @@ Cons:
 
 ### Build
 
-To Build manualy
+Iam using combination of batch scripts and `build.rs`, deppending on target OS.
 
-1. Install `Rust 1.88.0`
+### Windows:
+
+1. Install `Rust 1.88.0`, if not done yet.
 2. Navigate to project directory and execute from terminal:
-   `cargo build`
+   `cargo build --release`
+
+This is esiest way to do it.
+
+### OSx
+
+1. Install `Rust 1.88.0` if not done yet.
+2. Navigate to project directory and execute from terminal:
+   `cargo build --release`
+3. After build is done you will notice addition folder to appear `builds/macos`
+4. copy bin file `frapi` from Rust default target folder to `builds/<frapi version>/macos/frapi.app/MacOS`
+
+**NOTICE:** For this build i use custom simple batch script to automate this copy.  
+All additional folders for MacOS application made inside `build.rs` before compilaiton of main application.
 
 ### Roadmap:
 
-1. Create working build with basic client reqeust info
-2. Create `Settings` page with some base settings
-3. Add self hosting servers with models builders for mocking data
+1. ~~Create working build with basic client request abilities~~ - Done
+2. Add authorizations - `Basic` and `Bearer`
+3. Add self hosting servers with models builders for mocking data for HTTP
+4. Add self hosting servers with models builders for mocking data for WS
+5. Add enviroment variables
+6. Add `mqtt` protocol for requests
+7. Create `Settings` page with some base settings

@@ -1,5 +1,5 @@
 use std::{
-    fs::{File, OpenOptions},
+    fs::{self, File, OpenOptions},
     io::{BufReader, Write},
     path::PathBuf,
 };
@@ -20,8 +20,23 @@ pub mod main_settings;
 pub mod options_settings;
 pub mod ui_settings;
 
+#[cfg(not(debug_assertions))]
+fn default_settings_filepath() -> String {
+    format!("{}/cache.json", default_settings_path())
+}
+
+#[cfg(debug_assertions)]
 fn default_settings_filepath() -> String {
     "cache.json".into()
+}
+
+fn default_settings_path() -> String {
+    if std::env::consts::OS == "macos" {
+        let home_dir = std::env::var("HOME").unwrap();
+        format!("{home_dir}/.frapi")
+    } else {
+        "./".into()
+    }
 }
 
 // All settings from application
@@ -35,6 +50,18 @@ pub struct Settings {
 impl Settings {
     /// Initial load of by default path
     pub fn load() -> Self {
+        // Checking if default path with settings exist
+
+        match fs::exists(default_settings_path()) {
+            Ok(is_exist) => {
+                if !is_exist {
+                    // println!("{:?}", fs::canonicalize(default_settings_path()));
+                    fs::create_dir(default_settings_path()).unwrap()
+                }
+            }
+            Err(_) => fs::create_dir(default_settings_path()).unwrap(),
+        }
+
         let file = match File::open(default_settings_filepath()) {
             Ok(val) => val,
             Err(err) => match err.kind() {

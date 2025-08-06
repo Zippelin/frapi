@@ -7,18 +7,26 @@ use std::{
 };
 
 use egui::ahash::HashMap;
-use tokio_tungstenite::tungstenite::Message as TokioMessage;
+use tokio_tungstenite::{
+    tungstenite::{handshake::client::Request, Message as TokioMessage},
+    MaybeTlsStream, WebSocketStream,
+};
 
-use futures::{executor::block_on, SinkExt, StreamExt, TryStreamExt};
+use futures::{
+    executor::block_on,
+    stream::{SplitSink, SplitStream},
+    SinkExt, StreamExt, TryStreamExt,
+};
 use reqwest::{
     header::{HeaderName, HeaderValue, CONTENT_TYPE},
     redirect::Policy,
     Client,
 };
 use tokio::{
+    net::TcpStream,
     select,
     sync::mpsc::{channel, Receiver, Sender},
-    time,
+    time::{self, sleep},
 };
 use tokio_tungstenite::connect_async;
 
@@ -256,13 +264,12 @@ impl Executor {
                     command.drop_message();
                 };
 
-                // TODO: add settings to WS connection
                 let setup = match data.setup.ws() {
                     Some(val) => val,
                     None => &RequestWsSetup::default(),
                 };
 
-                self.spawn_ws_connection(command, events);
+                self.spawn_ws_connection(command, setup, events);
             }
 
             return;
@@ -444,12 +451,18 @@ impl Executor {
     }
 
     /// Spawn separate thread for websocket
-    fn spawn_ws_connection(&mut self, command: Command, events: Arc<Mutex<Events>>) {
+    fn spawn_ws_connection(
+        &mut self,
+        command: Command,
+        settings: &RequestWsSetup,
+        events: Arc<Mutex<Events>>,
+    ) {
         let (sender, receiver) = channel::<Message>(100);
         self.channel_sender = Some(sender);
 
         tokio::spawn(Self::ws_thread(
             command,
+            settings.clone(),
             Arc::clone(&self.responses),
             Arc::clone(&events),
             receiver,
@@ -460,12 +473,12 @@ impl Executor {
     /// Thread for websocket requests
     async fn ws_thread(
         command: Command,
+        settings: RequestWsSetup,
         responses: Arc<Mutex<Vec<Response>>>,
         events: Arc<Mutex<Events>>,
         mut command_channel: Receiver<Message>,
         executor_state: Arc<Mutex<State>>,
     ) {
-        let _ = events;
         match command {
             Command::EXECUTE(command_execute) => {
                 let uri = format!(
@@ -474,8 +487,9 @@ impl Executor {
                     command_execute.uri
                 );
 
-                let mut request = uri.clone().into_client_request().unwrap();
+                let mut request: Request = uri.clone().into_client_request().unwrap();
 
+                // Add headers
                 for header in command_execute.headers {
                     let key = match HeaderName::from_bytes(header.key.as_bytes()) {
                         Ok(val) => val,
@@ -503,22 +517,27 @@ impl Executor {
                     request.headers_mut().insert(key, value);
                 }
 
-                let (ws_stream, _) = match connect_async(request).await {
-                    Ok(data) => data,
-                    Err(err) => {
-                        events
-                            .lock()
-                            .unwrap()
-                            .event_error(&format!("Error: Could not connect to WS. Error: {err}"));
+                // Try to connect
+                let io_result = get_ws_io(
+                    request.clone(),
+                    settings.reconnection_attempts(),
+                    settings.reconnection_timeout(),
+                    Arc::clone(&executor_state),
+                    Arc::clone(&events),
+                )
+                .await;
 
-                        *executor_state.lock().unwrap() = State::FREE;
-                        return;
-                    }
-                };
+                if io_result.is_none() {
+                    events
+                        .lock()
+                        .unwrap()
+                        .event_error(&format!("Error: Reached max reconnect retrys."));
+                    return;
+                }
+
+                let (mut write, mut read) = io_result.unwrap();
 
                 let mut request_interval = time::interval(Duration::from_millis(60));
-
-                let (mut write, mut read) = ws_stream.split();
 
                 events
                     .lock()
@@ -534,11 +553,13 @@ impl Executor {
                         .await;
                 }
 
+                // Executing main loop
                 loop {
                     select! {
                         message = read.try_next() => {
                             match message {
                                 Ok(Some(val)) => {
+                                    // Received MSG text
                                     match val {
                                         TokioMessage::Text(utf8_bytes) => {
                                             events
@@ -550,6 +571,7 @@ impl Executor {
                                             );
                                             continue;
                                         },
+                                        // Received Remote Close
                                         TokioMessage::Close(_) => {
                                             events
                                                 .lock()
@@ -568,6 +590,7 @@ impl Executor {
                                     }
                                 },
                                 Ok(None) => {continue;}
+                                // Error reading channel
                                 Err(e) =>{
                                     events
                                         .lock()
@@ -576,8 +599,26 @@ impl Executor {
                                     responses.lock().unwrap().push(
                                         Response::closed_connection()
                                     );
-                                    *executor_state.lock().unwrap() = State::FREE;
-                                    break;
+
+                                    // If error occured, try to reconnect with settings
+                                    let io_result = get_ws_io(
+                                        request.clone(),
+                                        settings.reconnection_attempts(),
+                                        settings.reconnection_timeout(),
+                                        Arc::clone(&executor_state),
+                                        Arc::clone(&events),
+                                    )
+                                    .await;
+
+                                    if io_result.is_none() {
+                                        events
+                                            .lock()
+                                            .unwrap()
+                                            .event_error(&format!("Error: Reached max reconnect retrys."));
+                                        return;
+                                    }
+
+                                    (write, read) = io_result.unwrap();
                                 }
                             };
                         }
@@ -594,6 +635,7 @@ impl Executor {
 
                             match message {
                                 Message::COMMAND(command) => match command {
+                                    // Found message to send to WS
                                     Command::EXECUTE(command_execute) => {
                                         events
                                             .lock()
@@ -615,6 +657,7 @@ impl Executor {
                                             }
                                         };
                                     }
+                                    // Found connection termante reqeust
                                     Command::TERRMINATE => {
                                         events
                                             .lock()
@@ -625,6 +668,7 @@ impl Executor {
                                         break;
                                     }
                                 },
+                                // Cant happen - result message, usualy happen from WS->Client
                                 Message::RESULT(result) => {
                                     events
                                         .lock()
@@ -657,5 +701,40 @@ impl Executor {
             return;
         };
         let _ = block_on(self.channel_sender.as_mut().unwrap().send(message));
+    }
+}
+
+async fn get_ws_io(
+    request: Request,
+    max_reconnects: usize,
+    reconnects_timeout: u64,
+    executor_state: Arc<Mutex<State>>,
+    events: Arc<Mutex<Events>>,
+) -> Option<(
+    SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tokio_tungstenite::tungstenite::Message>,
+    SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>,
+)> {
+    let mut current_connection_retry = 0;
+
+    loop {
+        let (ws_stream, _) = match connect_async(request.clone()).await {
+            Ok(data) => data,
+            Err(err) => {
+                events.lock().unwrap().event_error(&format!(
+                    "Error: Could not connect to WS. Retry: {}. Error: {err}",
+                    current_connection_retry + 1
+                ));
+
+                if max_reconnects == current_connection_retry {
+                    *executor_state.lock().unwrap() = State::FREE;
+                    return None;
+                } else {
+                    current_connection_retry += 1;
+                    sleep(Duration::from_millis(reconnects_timeout)).await;
+                    continue;
+                }
+            }
+        };
+        return Some(ws_stream.split());
     }
 }

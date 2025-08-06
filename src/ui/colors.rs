@@ -15,7 +15,7 @@ impl ThemeColors {
     pub fn dark() -> Self {
         Self {
             main: Color32::from_hex("#212529").unwrap(),
-            secondary: Color32::from_hex("#495057").unwrap(),
+            secondary: Color32::from_hex("#6c757d").unwrap(),
             danger: Color32::from_hex("#ee6c4d").unwrap(),
             light: Color32::from_hex("#6c757d").unwrap(),
             lighter: Color32::from_hex("#adb5bd").unwrap(),
@@ -27,13 +27,13 @@ impl ThemeColors {
     // TODO: добавить цвета светлой темы
     pub fn light() -> Self {
         Self {
-            main: Color32::from_hex("#212529").unwrap(),
-            secondary: Color32::from_hex("#495057").unwrap(),
-            danger: Color32::from_hex("#ee6c4d").unwrap(),
-            light: Color32::from_hex("#6c757d").unwrap(),
-            lighter: Color32::from_hex("#adb5bd").unwrap(),
-            success: Color32::from_hex("#22BB33").unwrap(),
-            warning: Color32::from_hex("#f0ad4e").unwrap(),
+            main: Color32::from_hex("#e3d5ca").unwrap(),
+            secondary: Color32::from_hex("#68747c").unwrap(),
+            danger: Color32::from_hex("#F7A072").unwrap(),
+            light: Color32::from_hex("#edede9").unwrap(),
+            lighter: Color32::from_hex("#9d8189").unwrap(),
+            success: Color32::from_hex("#06d6a0").unwrap(),
+            warning: Color32::from_hex("#EDDEA4").unwrap(),
         }
     }
 }

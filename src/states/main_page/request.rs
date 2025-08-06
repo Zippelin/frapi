@@ -376,6 +376,16 @@ impl From<&RequestWsSetupSettings> for RequestWsSetup {
     }
 }
 
+impl RequestWsSetup {
+    pub fn reconnection_timeout(&self) -> u64 {
+        self.reconnection_timeout.parse::<u64>().unwrap_or(9000)
+    }
+
+    pub fn reconnection_attempts(&self) -> usize {
+        self.reconnection_attempts.parse::<usize>().unwrap_or(9)
+    }
+}
+
 impl Default for RequestWsSetup {
     fn default() -> Self {
         Self {

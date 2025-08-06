@@ -2,3 +2,5 @@
 /builds/build*
 /builds/*/*/cache.json
 docs/img/Thumbs.db
+/builds
+cache.json

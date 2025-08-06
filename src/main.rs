@@ -1,4 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use eframe::App;
 use eframe::Frame;
 use egui::Context;
@@ -26,9 +27,14 @@ impl Frapi {
     pub fn run() {
         let app_states = Self::new();
 
+        // Loads PNG icon on build
+        let icon_bytes = include_bytes!("../assets/icon.png");
+        let icon = eframe::icon_data::from_png_bytes(icon_bytes).unwrap();
+
         let mut viewport = egui::ViewportBuilder::default()
             .with_inner_size(app_states.ui.states.options.window_size)
-            .with_min_inner_size([800.0, 600.]);
+            .with_min_inner_size([800.0, 600.])
+            .with_icon(icon);
 
         if let Some(pos) = app_states.ui.states.options.window_position {
             viewport = viewport.with_position(pos)

@@ -1,8 +1,8 @@
 use std::{path::PathBuf, process::exit, sync::Arc};
 
 use egui::{
-    vec2, Context, CornerRadius, Frame, Label, Margin, MenuBar, Pos2, RichText, TopBottomPanel,
-    Visuals, WidgetText, Window,
+    vec2, Button, Context, CornerRadius, Frame, Label, Margin, MenuBar, Pos2, RichText,
+    TopBottomPanel, Visuals, WidgetText, Window,
 };
 use rfd::FileDialog;
 
@@ -38,8 +38,8 @@ impl MainMenu {
                     // Убираем скругление для панели меню
                     ui.ctx().set_visuals(Visuals {
                         menu_corner_radius: CornerRadius::ZERO,
-                        window_fill: states.style.color_light(),
-                        extreme_bg_color: states.style.color_light(),
+                        window_fill: states.style.color_secondary(),
+                        // extreme_bg_color: states.style.color_secondary(),
                         ..ui.visuals().clone()
                     });
 
@@ -51,6 +51,11 @@ impl MainMenu {
                             .color(states.style.color_main()),
                         |ui| {
                             ui.style_mut().spacing.button_padding = vec2(10., 10.);
+                            ui.style_mut().visuals.widgets.hovered.weak_bg_fill =
+                                states.style.color_lighter();
+                            ui.style_mut().visuals.widgets.open.weak_bg_fill =
+                                states.style.color_lighter();
+
                             if ui
                                 .button(
                                     states
@@ -63,7 +68,7 @@ impl MainMenu {
                             {
                                 states.save(None);
                             };
-                            ui.style_mut().spacing.button_padding = vec2(10., 10.);
+
                             if ui
                                 .button(
                                     states
@@ -85,6 +90,11 @@ impl MainMenu {
                                     .color(states.style.color_main()),
                                 |ui| {
                                     ui.style_mut().spacing.button_padding = vec2(10., 10.);
+                                    ui.style_mut().visuals.widgets.hovered.weak_bg_fill =
+                                        states.style.color_lighter();
+                                    ui.style_mut().visuals.widgets.open.weak_bg_fill =
+                                        states.style.color_lighter();
+
                                     if ui
                                         .button(
                                             states
@@ -146,12 +156,70 @@ impl MainMenu {
                             .color(states.style.color_main()),
                         |ui| {
                             ui.style_mut().spacing.button_padding = vec2(10., 10.);
-                            let _ = ui.button(
+                            ui.style_mut().visuals.widgets.hovered.weak_bg_fill =
+                                states.style.color_lighter();
+                            ui.style_mut().visuals.widgets.open.weak_bg_fill =
+                                states.style.color_lighter();
+
+                            ui.menu_button(
                                 states
                                     .style
                                     .fonts
                                     .menu_text("Settings")
                                     .color(states.style.color_main()),
+                                |ui| {
+                                    ui.style_mut().spacing.button_padding = vec2(10., 10.);
+                                    ui.style_mut().visuals.widgets.hovered.weak_bg_fill =
+                                        states.style.color_lighter();
+                                    ui.style_mut().visuals.widgets.open.weak_bg_fill =
+                                        states.style.color_lighter();
+
+                                    ui.menu_button(
+                                        states
+                                            .style
+                                            .fonts
+                                            .menu_text("Theme")
+                                            .color(states.style.color_main()),
+                                        |ui| {
+                                            ui.style_mut().spacing.button_padding = vec2(10., 10.);
+                                            ui.style_mut().visuals.widgets.hovered.weak_bg_fill =
+                                                states.style.color_lighter();
+                                            ui.style_mut().visuals.widgets.open.weak_bg_fill =
+                                                states.style.color_lighter();
+
+                                            if ui
+                                                .add(
+                                                    Button::new(
+                                                        states
+                                                            .style
+                                                            .fonts
+                                                            .menu_text("Light")
+                                                            .color(states.style.color_main()),
+                                                    )
+                                                    .selected(!states.style.is_dark_theme()),
+                                                )
+                                                .clicked()
+                                            {
+                                                states.style.to_light_theme();
+                                            };
+                                            if ui
+                                                .add(
+                                                    Button::new(
+                                                        states
+                                                            .style
+                                                            .fonts
+                                                            .menu_text("Dark")
+                                                            .color(states.style.color_main()),
+                                                    )
+                                                    .selected(states.style.is_dark_theme()),
+                                                )
+                                                .clicked()
+                                            {
+                                                states.style.to_dark_theme();
+                                            };
+                                        },
+                                    );
+                                },
                             );
 
                             if ui
@@ -178,6 +246,11 @@ impl MainMenu {
                             .color(states.style.color_main()),
                         |ui| {
                             ui.style_mut().spacing.button_padding = vec2(10., 10.);
+                            ui.style_mut().visuals.widgets.hovered.weak_bg_fill =
+                                states.style.color_lighter();
+                            ui.style_mut().visuals.widgets.open.weak_bg_fill =
+                                states.style.color_lighter();
+
                             if ui
                                 .button(
                                     states
@@ -248,22 +321,22 @@ impl MainMenu {
                         );
 
                         ui.add_space(10.);
-                        ui.add(Label::new("Ver: 0.1.0 beta").selectable(false));
+                        ui.add(Label::new("Ver: 0.1.0").selectable(false));
                         ui.add_space(10.);
                         ui.add(
                             Label::new(
-                                "This is free and light HTTP requests tracker and tester. Easy to use and easy to copy between desktops.",
+                                "This is free and light HTTP\\WS requests tracker and tester. Easy to use and easy to copy between desktops.",
                             )
                             .selectable(false),
                         );
                         ui.add(
-                            Label::new("Application based on Rust lang").selectable(false),
+                            Label::new("Application based on Rust lang, powered by Egui.").selectable(false),
                         );
                         ui.add_space(10.);
-                        ui.add(Label::new("License: FreeWare").selectable(false));
-                        ui.add(Label::new("GitHub: ___").selectable(false));
+                        ui.add(Label::new("License: MiT").selectable(false));
+                        ui.add(Label::new("GitHub: https://github.com/Zippelin/frapi").selectable(true));
                         ui.add_space(10.);
-                        ui.add(Label::new("@ 2025 Frapi Team").selectable(false));
+                        ui.add(Label::new("@2025 Frapi Team").selectable(false));
                     })
             });
     }

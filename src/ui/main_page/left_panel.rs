@@ -32,7 +32,7 @@ impl LeftPanel {
                 ui.horizontal(|ui| {
                     // Group of Add new Entity buttons adn filter
                     Frame::new()
-                        .fill(states.style.color_secondary())
+                        // .fill(states.style.color_secondary())
                         .inner_margin(Margin::same(5))
                         .show(ui, |ui| {
                             ui.style_mut().spacing.button_padding = vec2(10., 10.);
@@ -41,7 +41,7 @@ impl LeftPanel {
                                     .style
                                     .fonts
                                     .menu_text("New")
-                                    .color(states.style.color_lighter()),
+                                    .color(states.style.color_secondary()),
                                 |ui| {
                                     ui.style_mut().spacing.button_padding = vec2(10., 10.);
 
@@ -178,19 +178,13 @@ impl VisualEntity {
                     .selected_entity
                     .collection_is_selected(entity_idx);
 
-                // Apply visual mark on changes
-                let collection_text = if collection.is_changed {
-                    &format!("{} *", &collection.draft.name)
-                } else {
-                    &collection.draft.name
-                };
-
                 let (fold_btn_resp, folder_btn_resp, delete_btn_resp) = self
                     .update_collection_entity(
                         ui,
                         collection.is_folded,
                         is_selected,
-                        collection_text,
+                        collection.is_changed,
+                        &collection.draft.name,
                         states.style.clone(),
                     );
 
@@ -319,20 +313,20 @@ impl VisualEntity {
             ui.horizontal(|ui| {
                 ui.style_mut().spacing.item_spacing = vec2(0., 0.);
                 ui.style_mut().spacing.button_padding = vec2(5., 8.);
-                let request_details_text = self.get_request_details_text(method, protocol);
+                let request_details_text = self.get_request_details_text(method, protocol, &style);
 
                 // Truncatet name so layout wont break cos of overflow
-                let allowed_letters = (ui.available_size().x - 30.) / 8.5;
+                let allowed_letters = (ui.available_size().x - 60.) / 8.5;
                 let request_text = if request_text.len() as f32 >= allowed_letters {
                     &format!(
                         "{}...",
-                        request_text.split_at(allowed_letters as usize - 3).0
+                        request_text.split_at(allowed_letters as usize - 5).0
                     )
                 } else {
                     request_text
                 };
 
-                let request_text = self.get_request_text(is_changed, request_text);
+                let request_text = self.get_request_text(is_changed, request_text, &style);
 
                 Frame::new()
                     .inner_margin(Margin::symmetric(5, 9))
@@ -382,6 +376,7 @@ impl VisualEntity {
         ui: &mut Ui,
         is_folded: bool,
         is_selected: bool,
+        is_changed: bool,
         collection_text: &String,
         style: Style,
     ) -> (Response, Response, Response) {
@@ -407,11 +402,11 @@ impl VisualEntity {
                     ui.style_mut().spacing.button_padding = vec2(5., 7.);
 
                     // Truncatet name so layout wont break cos of overflow
-                    let allowed_letters = (ui.available_size().x - 30.) / 7.;
+                    let allowed_letters = (ui.available_size().x - 60.) / 8.;
                     let collection_text = if collection_text.len() as f32 >= allowed_letters {
                         &format!(
                             "{}...",
-                            collection_text.split_at(allowed_letters as usize - 3).0
+                            collection_text.split_at(allowed_letters as usize - 5).0
                         )
                     } else {
                         collection_text
@@ -422,7 +417,7 @@ impl VisualEntity {
                             // Button selectable of collection
                             let collection_folder = Button::selectable(
                                 is_selected,
-                                self.get_collection_text(!is_folded, &collection_text),
+                                self.get_collection_text(is_changed, &collection_text, &style),
                             )
                             .corner_radius(CornerRadius::ZERO)
                             .min_size(vec2(ui.available_size().x - 30., 15.))
@@ -454,7 +449,12 @@ impl VisualEntity {
     }
 
     /// Painted request details text
-    fn get_request_details_text(&self, method: &Method, protocol: &Protocol) -> LayoutJob {
+    fn get_request_details_text(
+        &self,
+        method: &Method,
+        protocol: &Protocol,
+        style: &Style,
+    ) -> LayoutJob {
         let mut job = LayoutJob::default();
         job.break_on_newline = true;
 
@@ -466,7 +466,7 @@ impl VisualEntity {
             ),
             0.,
             TextFormat {
-                color: Color32::LIGHT_GREEN,
+                color: style.color_success(),
                 font_id: FontId::new(6.0, FontFamily::Monospace),
 
                 ..Default::default()
@@ -476,7 +476,12 @@ impl VisualEntity {
     }
 
     /// Painted request item text
-    fn get_request_text(&self, is_changed: bool, request_text: &String) -> LayoutJob {
+    fn get_request_text(
+        &self,
+        is_changed: bool,
+        request_text: &String,
+        style: &Style,
+    ) -> LayoutJob {
         let mut job = LayoutJob::default();
 
         let request_text = if is_changed {
@@ -489,8 +494,8 @@ impl VisualEntity {
             &request_text,
             0.,
             TextFormat {
-                color: Color32::LIGHT_GRAY,
-                font_id: FontId::new(13.0, FontFamily::Proportional),
+                color: style.color_secondary(),
+                font_id: FontId::new(13.0, FontFamily::Monospace),
                 ..Default::default()
             },
         );
@@ -498,30 +503,26 @@ impl VisualEntity {
     }
 
     /// Painted collection item text
-    fn get_collection_text(&self, is_selected: bool, text: &String) -> LayoutJob {
-        let _ = is_selected;
+    fn get_collection_text(
+        &self,
+        is_changed: bool,
+        collection_text: &String,
+        style: &Style,
+    ) -> LayoutJob {
         let mut job = LayoutJob::default();
 
-        // let icon = if is_selected {
-        //     &Icon::folder_open()
-        // } else {
-        //     &Icon::folder_closed()
-        // };
-        // job.append(
-        //     icon,
-        //     10.,
-        //     TextFormat {
-        //         color: Color32::LIGHT_GRAY,
-        //         font_id: FontId::new(15.0, FontFamily::Proportional),
-        //         ..Default::default()
-        //     },
-        // );
+        let collection_text = if is_changed {
+            &format!("{} *", collection_text)
+        } else {
+            collection_text
+        };
+
         job.append(
-            text,
+            collection_text,
             5.,
             TextFormat {
-                color: Color32::LIGHT_GRAY,
-                font_id: FontId::new(13.0, FontFamily::Proportional),
+                color: style.color_secondary(),
+                font_id: FontId::new(13.0, FontFamily::Monospace),
                 ..Default::default()
             },
         );

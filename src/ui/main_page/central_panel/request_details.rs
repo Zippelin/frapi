@@ -298,7 +298,7 @@ impl RequestDetailsPanel {
         Frame::new().show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.add(Label::new(
-                    states.style.fonts.label_text("Reconnection timeout:"),
+                    states.style.fonts.label_text("Reconnection timeout (ms):"),
                 ));
 
                 ui.add_space(25.);
@@ -657,7 +657,7 @@ impl RequestDetailsPanel {
                         ui.horizontal(|ui| {
                             let header_key_resp = ui.add(
                                 TextEdit::singleline(&mut items[i].key)
-                                    .text_color(style.color_main())
+                                    .text_color(style.color_secondary())
                                     .font(style.fonts.textedit_small()),
                             );
 
@@ -685,7 +685,7 @@ impl RequestDetailsPanel {
                             let header_value_reasp = ui.add(
                                 TextEdit::singleline(&mut items[i].value)
                                     .desired_width(ui.available_width() - 25.)
-                                    .text_color(style.color_main())
+                                    .text_color(style.color_secondary())
                                     .font(style.fonts.textedit_small()),
                             );
 
@@ -864,34 +864,37 @@ impl RequestDetailsPanel {
         let request = request.unwrap();
 
         if [Protocol::WS, Protocol::WSS].contains(&request.draft.protocol) {
-            ui.horizontal(|ui| {
-                if ui
-                    .add(Button::new("Custom").fill(
-                        if request.visible_headers == RequestHeaders::Custom {
-                            states.style.color_light()
-                        } else {
-                            states.style.color_main()
-                        },
-                    ))
-                    .clicked()
-                {
-                    request.visible_headers = RequestHeaders::Custom
-                };
+            ui.group(|ui| {
+                ui.horizontal(|ui| {
+                    if ui
+                        .add(Button::new("Custom").fill(
+                            if request.visible_headers == RequestHeaders::Custom {
+                                states.style.color_light()
+                            } else {
+                                states.style.color_main()
+                            },
+                        ))
+                        .clicked()
+                    {
+                        request.visible_headers = RequestHeaders::Custom
+                    };
 
-                if ui
-                    .add(Button::new("Default").fill(
-                        if request.visible_headers == RequestHeaders::Default {
-                            states.style.color_light()
-                        } else {
-                            states.style.color_main()
-                        },
-                    ))
-                    .clicked()
-                {
-                    request.visible_headers = RequestHeaders::Default
-                };
+                    if ui
+                        .add(Button::new("Default").fill(
+                            if request.visible_headers == RequestHeaders::Default {
+                                states.style.color_light()
+                            } else {
+                                states.style.color_main()
+                            },
+                        ))
+                        .clicked()
+                    {
+                        request.visible_headers = RequestHeaders::Default
+                    };
+                    ui.add_space(ui.available_width());
+                });
             });
-        }
+        };
 
         if request.visible_headers == RequestHeaders::Custom {
             if self
@@ -1052,7 +1055,7 @@ impl RequestDetailsPanel {
                             TextEdit::singleline(&mut request.draft.uri)
                                 .desired_width(ui.available_width() - 45.)
                                 .text_color(states.style.color_lighter())
-                                .background_color(states.style.color_secondary())
+                                .background_color(states.style.color_light())
                                 .font(states.style.fonts.textedit_big()),
                         );
 

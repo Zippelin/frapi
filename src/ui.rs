@@ -10,7 +10,7 @@ use crate::{
 mod bottom;
 pub mod colors;
 pub mod fonts;
-mod icons;
+pub mod icons;
 mod main_menu;
 mod main_page;
 
@@ -49,6 +49,8 @@ impl UI {
         } else {
             ctx.set_theme(ThemePreference::Light);
         }
+
+        // ctx.set_theme(ThemePreference::Dark);
 
         self.main_menu.update(ctx, &mut self.states);
         self.bottom.update(ctx, &mut self.states);

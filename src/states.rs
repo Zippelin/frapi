@@ -199,6 +199,14 @@ impl From<&UISettings> for Style {
 }
 
 impl Style {
+    pub fn to_dark_theme(&mut self) {
+        self.theme = Theme::Dark(ThemeColors::dark())
+    }
+
+    pub fn to_light_theme(&mut self) {
+        self.theme = Theme::Light(ThemeColors::light())
+    }
+
     pub fn color_main(&self) -> Color32 {
         match &self.theme {
             Theme::Light(theme_colors) => theme_colors.main,
