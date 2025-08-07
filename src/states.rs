@@ -103,7 +103,7 @@ impl States {
 
         let deletion_done = self.main_page.delete_marked_entity();
 
-        if move_done {
+        if move_done || deletion_done || dnd_done {
             self.save_original(None);
         }
     }

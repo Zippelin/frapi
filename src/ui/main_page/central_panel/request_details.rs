@@ -405,9 +405,11 @@ impl RequestDetailsPanel {
         ScrollArea::vertical().show(ui, |ui| {
             Frame::new().inner_margin(Margin::same(5)).show(ui, |ui| {
                 ui.horizontal(|ui| {
+                    ui.style_mut().visuals.extreme_bg_color = style.color_secondary();
                     let textedit = TextEdit::multiline(&mut counted_text.message)
                         .min_size(vec2(ui.available_width() - 20., ui.available_height()))
-                        .code_editor();
+                        .code_editor()
+                        .text_color(style.color_main());
 
                     ui.style_mut().spacing.item_spacing = vec2(2., 3.);
                     ui.vertical(|ui| {
@@ -516,10 +518,11 @@ impl RequestDetailsPanel {
         ui.horizontal(|ui| {
             ui.group(|ui| {
                 let request = states.main_page.selected_request_mut().unwrap();
-
+                ui.style_mut().visuals.extreme_bg_color = states.style.color_secondary();
                 ui.add(
                     TextEdit::singleline(&mut request.draft.body.binary_path)
-                        .desired_width(ui.available_width() - 65.),
+                        .desired_width(ui.available_width() - 65.)
+                        .text_color(states.style.color_main()),
                 );
 
                 if ui.add(Button::new("Browse")).clicked() {
@@ -655,9 +658,10 @@ impl RequestDetailsPanel {
                 .show(ui, |ui| {
                     for i in 0..items.len() {
                         ui.horizontal(|ui| {
+                            ui.style_mut().visuals.extreme_bg_color = style.color_secondary();
                             let header_key_resp = ui.add(
                                 TextEdit::singleline(&mut items[i].key)
-                                    .text_color(style.color_secondary())
+                                    .text_color(style.color_main())
                                     .font(style.fonts.textedit_small()),
                             );
 
@@ -685,7 +689,7 @@ impl RequestDetailsPanel {
                             let header_value_reasp = ui.add(
                                 TextEdit::singleline(&mut items[i].value)
                                     .desired_width(ui.available_width() - 25.)
-                                    .text_color(style.color_secondary())
+                                    .text_color(style.color_main())
                                     .font(style.fonts.textedit_small()),
                             );
 
@@ -715,6 +719,7 @@ impl RequestDetailsPanel {
 
                     if let Some(new_value) = new_value {
                         ui.horizontal(|ui| {
+                            ui.style_mut().visuals.extreme_bg_color = style.color_secondary();
                             let new_header_key_resp = ui.add(
                                 TextEdit::singleline(&mut new_value.key).hint_text("new form key"),
                             );
@@ -789,6 +794,7 @@ impl RequestDetailsPanel {
                 .show(ui, |ui| {
                     for i in 0..items.len() {
                         ui.horizontal(|ui| {
+                            ui.style_mut().visuals.extreme_bg_color = style.color_secondary();
                             let header_key_resp = ui.add(
                                 TextEdit::singleline(&mut items[i].key)
                                     .text_color(style.color_main())
@@ -828,6 +834,7 @@ impl RequestDetailsPanel {
 
                     if let Some(new_value) = new_value {
                         ui.horizontal(|ui| {
+                            ui.style_mut().visuals.extreme_bg_color = style.color_secondary();
                             let new_header_key_resp = ui.text_edit_singleline(&mut new_value.key);
                             let new_header_val_resp = ui.add(
                                 TextEdit::singleline(&mut new_value.value)

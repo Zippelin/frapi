@@ -97,6 +97,8 @@ impl LeftPanel {
                                 CornerRadius::ZERO;
                             ui.style_mut().visuals.widgets.noninteractive.corner_radius =
                                 CornerRadius::ZERO;
+                            ui.style_mut().visuals.extreme_bg_color =
+                                states.style.color_secondary();
 
                             let filter_textedit =
                                 TextEdit::singleline(&mut states.main_page.filter_text)

@@ -1,10 +1,8 @@
-use std::process::{exit, id};
-
 /// Stated of Main page of application
 ///
 use crate::{
     executor::State,
-    settings::{main_settings::entity::request_settings::protocol_settings, Settings},
+    settings::Settings,
     states::{
         main_page::{
             collection::Collection, entity::Entity, filtered_entity::FilteredEntities,

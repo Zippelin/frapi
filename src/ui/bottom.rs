@@ -1,4 +1,4 @@
-use egui::{Context, Frame, Label, Margin, Separator, TopBottomPanel};
+use egui::{Context, Frame, Label, Margin, RichText, Separator, TopBottomPanel};
 
 use crate::states::States;
 
@@ -20,9 +20,9 @@ impl BottomPanel {
                 ui.horizontal(|ui| {
                     ui.add_space(ui.available_width() - 400.);
 
-                    ui.add(Label::new("Items: ").selectable(false));
+                    ui.add(Label::new(RichText::new("Items: ").color(states.style.color_main())).selectable(false));
                     ui.add(
-                        Label::new(format!("{}", states.main_page.get_selected_items_count()))
+                        Label::new(RichText::new(format!("{}", states.main_page.get_selected_items_count())).color(states.style.color_main()))
                             .selectable(false),
                     )
                     .on_hover_text("Amount of items on root level or in collection");
@@ -31,9 +31,9 @@ impl BottomPanel {
                     ui.add(Separator::default().vertical());
                     ui.add_space(10.);
 
-                    ui.add(Label::new("Executor: ").selectable(false));
+                    ui.add(Label::new(RichText::new("Executor: ").color(states.style.color_main())).selectable(false));
                     ui.add(
-                        Label::new(states.main_page.selected_request_executor_state())
+                        Label::new(RichText::new(states.main_page.selected_request_executor_state()).color(states.style.color_main()))
                             .selectable(false),
                     )
                     .on_hover_text(
@@ -44,7 +44,7 @@ impl BottomPanel {
                     ui.add(Separator::default().vertical());
                     ui.add_space(10.);
 
-                    ui.add(Label::new("OS: ").selectable(false));
+                    ui.add(Label::new(RichText::new("OS: ").color(states.style.color_main())).selectable(false));
 
                     let os = match ctx.os() {
                         egui::os::OperatingSystem::Unknown => "Unknown".to_string(),
@@ -54,7 +54,7 @@ impl BottomPanel {
                         egui::os::OperatingSystem::Mac => "Mac".to_string(),
                         egui::os::OperatingSystem::Windows => "Windows".to_string(),
                     };
-                    ui.add(Label::new(os).selectable(false));
+                    ui.add(Label::new(RichText::new(os).color(states.style.color_main())).selectable(false));
 
                     ui.add_space(10.);
                     ui.add(Separator::default().vertical());

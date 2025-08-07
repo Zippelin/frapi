@@ -73,10 +73,13 @@ impl CentralPanel {
                             ui.add_space(10.);
                             ui.add(Label::new("Name:").selectable(false));
                             ui.add_space(30.);
+                            ui.style_mut().visuals.extreme_bg_color =
+                                states.style.color_secondary();
                             let resp_collection_name = ui.add(
                                 TextEdit::singleline(&mut collection.draft.name)
                                     .desired_width(ui.available_width() - 20.)
-                                    .font(states.style.fonts.textedit_big()),
+                                    .font(states.style.fonts.textedit_big())
+                                    .code_editor(),
                             );
 
                             if resp_collection_name.changed() {
@@ -86,11 +89,13 @@ impl CentralPanel {
                         ui.horizontal(|ui| {
                             ui.add_space(10.);
                             ui.add(Label::new("Description:").selectable(false));
-
+                            ui.style_mut().visuals.extreme_bg_color =
+                                states.style.color_secondary();
                             let resp_collection_desc = ui.add(
                                 TextEdit::multiline(&mut collection.draft.description)
                                     .min_size(vec2(ui.available_width() - 12., 200.))
-                                    .font(states.style.fonts.textedit_medium()),
+                                    .font(states.style.fonts.textedit_medium())
+                                    .code_editor(),
                             );
                             if resp_collection_desc.changed() {
                                 collection.is_changed = true;
