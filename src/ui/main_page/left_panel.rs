@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use egui::{
     text::LayoutJob, vec2, Align, Button, Color32, Context, CornerRadius, FontFamily, FontId,
-    FontSelection, Frame, Key, Label, Layout, Margin, Response, RichText, ScrollArea, SidePanel,
-    Stroke, TextEdit, TextFormat, TextWrapMode, Ui, WidgetText,
+    FontSelection, Frame, Key, Label, Layout, Margin, Rect, Response, RichText, ScrollArea, Sense,
+    SidePanel, Stroke, TextEdit, TextFormat, TextWrapMode, Ui, WidgetText,
 };
 
 use crate::{
@@ -178,6 +178,16 @@ impl VisualEntity {
                     .selected_entity
                     .collection_is_selected(entity_idx);
 
+                self.update_drop_target(
+                    ui,
+                    states
+                        .main_page
+                        .dnd_data
+                        .is_drop_entity(Some(entity_idx), None),
+                    states.main_page.dnd_data.is_dragged(),
+                    &states.style,
+                );
+
                 let (fold_btn_resp, folder_btn_resp, delete_btn_resp) = self
                     .update_collection_entity(
                         ui,
@@ -191,6 +201,21 @@ impl VisualEntity {
                 if fold_btn_resp.clicked() {
                     collection.is_folded = !collection.is_folded;
                 };
+
+                if folder_btn_resp.drag_started() {
+                    states
+                        .main_page
+                        .dnd_data
+                        .set_dragged(Some(entity_idx), None);
+                }
+
+                if folder_btn_resp.contains_pointer() && states.main_page.dnd_data.is_dragged() {
+                    states
+                        .main_page
+                        .dnd_data
+                        .set_dropped(Some(entity_idx), None);
+                }
+
                 if folder_btn_resp.clicked() {
                     states
                         .main_page
@@ -218,6 +243,13 @@ impl VisualEntity {
 
                 let requests_idxs = requests_idxs.unwrap();
 
+                // println!("collection {:?}", collection);
+                // println!("requests_idxs {:?}", requests_idxs);
+                // println!("\n");
+                if requests_idxs.len() == 0 {
+                    return;
+                }
+
                 if !collection.is_folded {
                     Frame::new()
                         .fill(states.style.color_secondary())
@@ -231,6 +263,16 @@ impl VisualEntity {
 
                                     let request = &collection.requests[request_idx];
 
+                                    self.update_drop_target(
+                                        ui,
+                                        states
+                                            .main_page
+                                            .dnd_data
+                                            .is_drop_entity(Some(entity_idx), Some(request_idx)),
+                                        states.main_page.dnd_data.is_dragged(),
+                                        &states.style,
+                                    );
+
                                     let (request_btn_resp, request_delete_resp) = self
                                         .update_request_entity(
                                             ui,
@@ -239,8 +281,26 @@ impl VisualEntity {
                                             &request.draft.protocol,
                                             request.is_changed,
                                             is_selected,
+                                            true,
                                             states.style.clone(),
                                         );
+
+                                    if request_btn_resp.drag_started() {
+                                        states
+                                            .main_page
+                                            .dnd_data
+                                            .set_dragged(Some(entity_idx), Some(request_idx));
+                                    };
+
+                                    if request_btn_resp.contains_pointer()
+                                        && states.main_page.dnd_data.is_dragged()
+                                    {
+                                        states
+                                            .main_page
+                                            .dnd_data
+                                            .set_dropped(Some(entity_idx), Some(request_idx));
+                                    }
+
                                     if request_btn_resp.clicked() {
                                         states
                                             .main_page
@@ -264,6 +324,17 @@ impl VisualEntity {
                     .selected_entity
                     .request_is_selected(None, entity_idx);
 
+                // Draw Separator for drop place indication
+                self.update_drop_target(
+                    ui,
+                    states
+                        .main_page
+                        .dnd_data
+                        .is_drop_entity(None, Some(entity_idx)),
+                    states.main_page.dnd_data.is_dragged(),
+                    &states.style,
+                );
+
                 let (request_btn_resp, request_delete_resp) = self.update_request_entity(
                     ui,
                     &request.draft.name,
@@ -271,8 +342,25 @@ impl VisualEntity {
                     &request.draft.protocol,
                     request.is_changed,
                     is_selected,
+                    false,
                     states.style.clone(),
                 );
+
+                // Settings dragged item
+                if request_btn_resp.drag_started() {
+                    states
+                        .main_page
+                        .dnd_data
+                        .set_dragged(None, Some(entity_idx));
+                }
+
+                // If DDragged setting this entity as drop target
+                if request_btn_resp.contains_pointer() && states.main_page.dnd_data.is_dragged() {
+                    states
+                        .main_page
+                        .dnd_data
+                        .set_dropped(None, Some(entity_idx));
+                }
 
                 if request_btn_resp.clicked() {
                     states
@@ -290,11 +378,8 @@ impl VisualEntity {
             }
         };
 
-        // If marked localy for delettion - transfer to global.
-        // Later on this deletion will be processes in this frame.
-        // if entity_for_deletion.is_selected() {
-        //     states.main_page.deletion_entity = entity_for_deletion;
-        // }
+        self.update_drop(ui, states);
+        self.update_dragged(ui, states);
     }
 
     /// Draw request  item
@@ -307,6 +392,7 @@ impl VisualEntity {
         protocol: &Protocol,
         is_changed: bool,
         is_selected: bool,
+        is_nested: bool,
         style: Style,
     ) -> (Response, Response) {
         ui.with_layout(Layout::top_down_justified(Align::LEFT), |ui| {
@@ -326,7 +412,8 @@ impl VisualEntity {
                     request_text
                 };
 
-                let request_text = self.get_request_text(is_changed, request_text, &style);
+                let request_text =
+                    self.get_request_text(is_changed, request_text, is_nested, &style);
 
                 Frame::new()
                     .inner_margin(Margin::symmetric(5, 9))
@@ -339,16 +426,17 @@ impl VisualEntity {
                                 .halign(Align::RIGHT),
                         )
                     });
-
                 // Separate layout so inner text could align left
                 let request_btn_response = ui
                     .with_layout(Layout::top_down(Align::LEFT), |ui| {
                         // Button selectable of collection
                         let request_btn = Button::selectable(is_selected, request_text)
                             .min_size(vec2(ui.available_width() - 30., 15.))
-                            .corner_radius(CornerRadius::ZERO);
-                        let request_btn_response = ui.add(request_btn);
-                        return request_btn_response;
+                            .corner_radius(CornerRadius::ZERO)
+                            .sense(Sense::click_and_drag())
+                            .image_tint_follows_text_color(true);
+
+                        ui.add(request_btn)
                     })
                     .inner;
 
@@ -421,7 +509,8 @@ impl VisualEntity {
                             )
                             .corner_radius(CornerRadius::ZERO)
                             .min_size(vec2(ui.available_size().x - 30., 15.))
-                            .wrap_mode(TextWrapMode::Truncate);
+                            .wrap_mode(TextWrapMode::Truncate)
+                            .sense(Sense::click_and_drag());
 
                             let collection_folder_response = ui.add(collection_folder);
                             return collection_folder_response;
@@ -480,6 +569,7 @@ impl VisualEntity {
         &self,
         is_changed: bool,
         request_text: &String,
+        is_nested: bool,
         style: &Style,
     ) -> LayoutJob {
         let mut job = LayoutJob::default();
@@ -494,7 +584,11 @@ impl VisualEntity {
             &request_text,
             0.,
             TextFormat {
-                color: style.color_secondary(),
+                color: if is_nested {
+                    style.color_main()
+                } else {
+                    style.color_secondary()
+                },
                 font_id: FontId::new(13.0, FontFamily::Monospace),
                 ..Default::default()
             },
@@ -528,5 +622,217 @@ impl VisualEntity {
         );
 
         job
+    }
+
+    // TODO: complete drop logic
+    fn update_drop(&self, ui: &mut Ui, states: &mut States) {
+        if !states.main_page.dnd_data.is_dragged() {
+            return;
+        }
+
+        ui.ctx().input(|r| {
+            if r.pointer.button_released(egui::PointerButton::Primary) {
+                states.main_page.dnd_data.finalize();
+                // let target_request_idx = states.main_page.drop_target.request_idx;
+                // let target_collection_idx = states.main_page.drop_target.collection_idx;
+
+                // let drag_request_idx = states.main_page.dragged_entity.request_idx;
+                // let drag_collection_idx = states.main_page.dragged_entity.collection_idx;
+
+                // // If Drag dropped over it self we dont do anything
+                // if target_request_idx == drag_request_idx
+                //     && target_collection_idx == drag_collection_idx
+                // {
+                //     states.main_page.clear_dnd_data();
+                //     return;
+                // }
+
+                // // if we drag inside same collection. And Dragged Item over Next item - we dont do anything.
+                // // Since element always inserted before Target(Drop) Entity - we at same place
+                // if (target_collection_idx.is_some() && drag_collection_idx.is_some())
+                //     && (target_collection_idx == drag_collection_idx)
+                //     && target_request_idx.is_some()
+                //     && drag_request_idx.is_some()
+                // {
+                //     let target_request_idx = target_request_idx.unwrap();
+                //     let drag_request_idx = drag_request_idx.unwrap();
+                //     if drag_request_idx == target_request_idx - 1 {
+                //         states.main_page.clear_dnd_data();
+                //         return;
+                //     }
+                // }
+
+                // // Getting Target Entity index in root level
+                // let target_root_idx =
+                //     if target_request_idx.is_some() && target_collection_idx.is_none() {
+                //         target_request_idx.unwrap()
+                //     } else if target_request_idx.is_none() && target_collection_idx.is_some() {
+                //         target_collection_idx.unwrap()
+                //     } else {
+                //         states.main_page.clear_dnd_data();
+                //         return;
+                //     };
+
+                // // Getting Dragged Entity index in root level
+                // let dragged_root_idx =
+                //     if drag_request_idx.is_some() && drag_collection_idx.is_none() {
+                //         drag_request_idx.unwrap()
+                //     } else if drag_request_idx.is_none() && drag_collection_idx.is_some() {
+                //         drag_collection_idx.unwrap()
+                //     } else {
+                //         states.main_page.clear_dnd_data();
+                //         return;
+                //     };
+                // // If Dragged Entity dropped over NEXT Entity - dont do anything
+                // if dragged_root_idx == target_root_idx - 1 {
+                //     states.main_page.clear_dnd_data();
+                //     return;
+                // }
+
+                // let removed_entity = if drag_collection_idx.is_some() && drag_request_idx.is_some()
+                // {
+                //     let drag_collection_idx = drag_collection_idx.unwrap();
+                //     let drag_request_idx = drag_request_idx.unwrap();
+
+                //     if let Entity::COLLECTION(collection) =
+                //         &mut states.main_page.entities[drag_collection_idx]
+                //     {
+                //         Entity::REQUEST(collection.requests.remove(drag_request_idx))
+                //     } else {
+                //         states.main_page.clear_dnd_data();
+                //         return;
+                //     }
+                // } else if drag_collection_idx.is_none() && drag_request_idx.is_some() {
+                //     let drag_request_idx = drag_request_idx.unwrap();
+
+                //     states.main_page.entities.remove(drag_request_idx)
+                // } else if drag_collection_idx.is_some() && drag_request_idx.is_none() {
+                //     let drag_collection_idx = drag_collection_idx.unwrap();
+
+                //     states.main_page.entities.remove(drag_collection_idx)
+                // } else {
+                //     states.main_page.clear_dnd_data();
+                //     return;
+                // };
+
+                // if target_collection_idx.is_some() && target_request_idx.is_some() {
+                //     let target_collection_idx = target_collection_idx.unwrap();
+                //     let target_request_idx = target_request_idx.unwrap();
+
+                //     if let Entity::COLLECTION(collection) =
+                //         &mut states.main_page.entities[target_collection_idx]
+                //     {
+                //         if let Entity::REQUEST(removed_request) = removed_entity {
+                //             collection
+                //                 .requests
+                //                 .insert(target_request_idx, removed_request);
+                //         }
+                //     }
+                // } else if target_collection_idx.is_none() && target_request_idx.is_some() {
+                //     let target_request_idx = target_request_idx.unwrap();
+                //     states
+                //         .main_page
+                //         .entities
+                //         .insert(target_request_idx, removed_entity);
+                // } else if target_collection_idx.is_some() && target_request_idx.is_none() {
+                //     let target_collection_idx = target_collection_idx.unwrap();
+                //     states
+                //         .main_page
+                //         .entities
+                //         .insert(target_collection_idx, removed_entity);
+                // } else {
+                //     states.main_page.clear_dnd_data();
+                //     return;
+                // }
+
+                // states.main_page.clear_dnd_data();
+            }
+        });
+    }
+
+    fn update_dragged(&self, ui: &mut Ui, states: &mut States) {
+        if states.main_page.dnd_data.is_dragged() {
+            let pointer_pos = match ui.ctx().pointer_hover_pos() {
+                Some(val) => val,
+                None => {
+                    states.main_page.dnd_data.clear();
+                    return;
+                }
+            };
+
+            let size = vec2(ui.available_width(), 40.);
+            let topmost_layer_on_pos = match ui.ctx().layer_id_at(pointer_pos) {
+                Some(val) => val,
+                None => {
+                    states.main_page.dnd_data.clear();
+                    return;
+                }
+            };
+            let mut painter = ui.ctx().layer_painter(topmost_layer_on_pos);
+
+            painter.set_opacity(0.5);
+            painter.rect_filled(
+                Rect::from_center_size(pointer_pos, size),
+                2.0,
+                states.style.color_secondary(),
+            );
+
+            // let selected_text = if states.main_page.dragged_entity.request_idx.is_some() {
+            //     states
+            //         .main_page
+            //         .dragged_request()
+            //         .unwrap()
+            //         .draft
+            //         .name
+            //         .clone()
+            // } else {
+            //     states
+            //         .main_page
+            //         .dragged_collection()
+            //         .unwrap()
+            //         .draft
+            //         .name
+            //         .clone()
+            // };
+
+            if let Some(selected_text) = states.main_page.get_dragged_entity_text() {
+                painter.text(
+                    pointer_pos,
+                    egui::Align2::CENTER_CENTER,
+                    &selected_text,
+                    egui::FontId::default(),
+                    states.style.color_main(),
+                );
+            }
+        }
+    }
+
+    /// Draw Separator for drop place indication
+    fn update_drop_target(
+        &self,
+        ui: &mut Ui,
+        is_drop_target: bool,
+        is_dragged: bool,
+        style: &Style,
+    ) {
+        if !is_drop_target || !is_dragged {
+            return;
+        }
+
+        // let current_is_selected = match current_request_idx {
+        //     Some(r_idx) => drop_target.request_is_selected(current_collection_idx, r_idx),
+        //     None => drop_target.collection_is_selected(current_collection_idx.unwrap()),
+        // };
+
+        // if current_is_selected {
+        Frame::new()
+            .fill(style.color_lighter())
+            .inner_margin(Margin::same(1))
+            .show(ui, |ui| {
+                ui.style_mut().visuals.widgets.noninteractive.bg_stroke =
+                    (1.0, style.color_lighter()).into();
+                ui.separator();
+            });
+        // };
     }
 }

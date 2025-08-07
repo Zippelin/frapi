@@ -50,8 +50,6 @@ impl UI {
             ctx.set_theme(ThemePreference::Light);
         }
 
-        // ctx.set_theme(ThemePreference::Dark);
-
         self.main_menu.update(ctx, &mut self.states);
         self.bottom.update(ctx, &mut self.states);
         match self.states.current_page {

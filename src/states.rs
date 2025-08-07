@@ -95,15 +95,15 @@ impl States {
         };
     }
 
-    /// Update all necerary plannes changes for states data for next frame
+    /// Update all planned changes for States Data, for next Frame
     pub fn update(&mut self) {
         let move_done = self.main_page.update_request_move();
-        if move_done {
-            self.save_original(None);
-        }
+
+        let dnd_done = self.main_page.update_dnd();
 
         let deletion_done = self.main_page.delete_marked_entity();
-        if deletion_done {
+
+        if move_done {
             self.save_original(None);
         }
     }

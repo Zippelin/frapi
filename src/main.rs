@@ -16,8 +16,6 @@ pub struct Frapi {
 }
 
 // TODO: add server side abilities
-// TODO: add events clean
-// TODO: make right side panel as vertical buttons
 // TODO: add drag and drop for entities list
 impl Frapi {
     pub fn new() -> Self {
