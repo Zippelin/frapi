@@ -11,6 +11,7 @@ pub struct ThemeColors {
     pub warning: Color32,
 }
 
+// TODO: make more colors for various widgets
 impl ThemeColors {
     pub fn dark() -> Self {
         Self {
@@ -24,7 +25,6 @@ impl ThemeColors {
         }
     }
 
-    // TODO: добавить цвета светлой темы
     pub fn light() -> Self {
         Self {
             main: Color32::from_hex("#b0a8a2").unwrap(),

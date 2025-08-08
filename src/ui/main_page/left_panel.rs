@@ -10,18 +10,23 @@ use crate::{
     settings::main_settings::entity::request_settings::{
         method_settigns::Method, protocol_settings::Protocol,
     },
-    states::{main_page::entity::Entity, States, Style},
+    states::{States, Style},
     ui::icons::Icon,
 };
 
-pub struct LeftPanel {}
+/// Left Panek windget
+pub struct LeftPanel {
+    /// Time spend while dragging on same Collection item
+    /// Used to auto open Collection if drag holded under it
+    time_elapsed: usize,
+}
 
 impl LeftPanel {
     pub fn new() -> Self {
-        Self {}
+        Self { time_elapsed: 0 }
     }
 
-    pub fn update(&self, ctx: &Context, states: &mut States) {
+    pub fn update(&mut self, ctx: &Context, states: &mut States) {
         // Заголовок с фильтром
         SidePanel::left("left")
             .default_width(200.)
@@ -152,7 +157,12 @@ impl LeftPanel {
                                 ui.style_mut().spacing.button_padding = vec2(0., 5.);
 
                                 for i in states.main_page.filtered_entities.root_entities_idxs() {
-                                    VisualEntity::new().update(ui, i, states);
+                                    VisualEntity::new().update(
+                                        ui,
+                                        i,
+                                        states,
+                                        &mut self.time_elapsed,
+                                    );
                                     ui.separator();
                                 }
                             });
@@ -169,215 +179,296 @@ impl VisualEntity {
         Self {}
     }
 
-    pub fn update(&self, ui: &mut Ui, entity_idx: usize, states: &mut States) {
-        // Mark for deletion after all updates done adn data freed from ownership
-        // let mut entity_for_deletion = SelectedEntity::new();
+    /// Draw collection item
+    fn update_collection(
+        &self,
+        ui: &mut Ui,
+        collection_idx: usize,
+        states: &mut States,
+        time_elapsed: &mut usize,
+    ) {
+        let collection = match states.main_page.entities[collection_idx].as_collection_mut() {
+            Some(val) => val,
+            None => return,
+        };
 
-        match &mut states.main_page.entities[entity_idx] {
-            Entity::COLLECTION(collection) => {
-                let is_selected = states
-                    .main_page
-                    .selected_entity
-                    .collection_is_selected(entity_idx);
+        let is_selected = states
+            .main_page
+            .selected_entity
+            .collection_is_selected(collection_idx);
 
-                self.update_drop_target(
-                    ui,
-                    states
-                        .main_page
-                        .dnd_data
-                        .is_drop_entity(Some(entity_idx), None),
-                    states.main_page.dnd_data.is_dragged(),
-                    &states.style,
-                );
+        self.update_drop_target(
+            ui,
+            states
+                .main_page
+                .dnd_data
+                .is_drop_entity(Some(collection_idx), None),
+            states.main_page.dnd_data.is_dragged(),
+            &states.style,
+        );
 
-                let (fold_btn_resp, folder_btn_resp, delete_btn_resp) = self
-                    .update_collection_entity(
-                        ui,
-                        collection.is_folded,
-                        is_selected,
-                        collection.is_changed,
-                        &collection.draft.name,
-                        states.style.clone(),
-                    );
+        let (fold_btn_resp, folder_btn_resp, delete_btn_resp) = self.update_collection_item(
+            ui,
+            collection.is_folded,
+            is_selected,
+            collection.is_changed,
+            &collection.draft.name,
+            states.style.clone(),
+        );
 
-                if fold_btn_resp.clicked() {
-                    collection.is_folded = !collection.is_folded;
-                };
+        if fold_btn_resp.clicked() {
+            collection.is_folded = !collection.is_folded;
+        };
 
-                if folder_btn_resp.drag_started() {
-                    states
-                        .main_page
-                        .dnd_data
-                        .set_dragged(Some(entity_idx), None);
-                }
+        if folder_btn_resp.drag_started() {
+            states
+                .main_page
+                .dnd_data
+                .set_dragged(Some(collection_idx), None);
+        }
 
-                if folder_btn_resp.contains_pointer() && states.main_page.dnd_data.is_dragged() {
-                    states
-                        .main_page
-                        .dnd_data
-                        .set_dropped(Some(entity_idx), None);
-                }
+        if folder_btn_resp.contains_pointer() && states.main_page.dnd_data.is_dragged() {
+            let drop_is_changed = states
+                .main_page
+                .dnd_data
+                .set_dropped(Some(collection_idx), None);
 
-                if folder_btn_resp.clicked() {
-                    states
-                        .main_page
-                        .selected_entity
-                        .select_collection(entity_idx);
-                };
-                if folder_btn_resp.double_clicked() {
-                    collection.is_folded = !collection.is_folded;
-                };
-                if delete_btn_resp.clicked() {
-                    states
-                        .main_page
-                        .deletion_entity
-                        .select_collection(entity_idx);
-                };
-
-                let requests_idxs = states
-                    .main_page
-                    .filtered_entities
-                    .collection_requests_idxs(entity_idx);
-
-                if requests_idxs.is_none() {
-                    return;
-                };
-
-                let requests_idxs = requests_idxs.unwrap();
-
-                // println!("collection {:?}", collection);
-                // println!("requests_idxs {:?}", requests_idxs);
-                // println!("\n");
-                if requests_idxs.len() == 0 {
-                    return;
-                }
-
-                if !collection.is_folded {
-                    Frame::new()
-                        .fill(states.style.color_secondary())
-                        .show(ui, |ui| {
-                            ui.indent(format!("collection-{}-reqeusts", entity_idx), |ui| {
-                                for request_idx in requests_idxs {
-                                    let is_selected = states
-                                        .main_page
-                                        .selected_entity
-                                        .request_is_selected(Some(entity_idx), request_idx);
-
-                                    let request = &collection.requests[request_idx];
-
-                                    self.update_drop_target(
-                                        ui,
-                                        states
-                                            .main_page
-                                            .dnd_data
-                                            .is_drop_entity(Some(entity_idx), Some(request_idx)),
-                                        states.main_page.dnd_data.is_dragged(),
-                                        &states.style,
-                                    );
-
-                                    let (request_btn_resp, request_delete_resp) = self
-                                        .update_request_entity(
-                                            ui,
-                                            &request.draft.name,
-                                            &request.draft.method,
-                                            &request.draft.protocol,
-                                            request.is_changed,
-                                            is_selected,
-                                            true,
-                                            states.style.clone(),
-                                        );
-
-                                    if request_btn_resp.drag_started() {
-                                        states
-                                            .main_page
-                                            .dnd_data
-                                            .set_dragged(Some(entity_idx), Some(request_idx));
-                                    };
-
-                                    if request_btn_resp.contains_pointer()
-                                        && states.main_page.dnd_data.is_dragged()
-                                    {
-                                        states
-                                            .main_page
-                                            .dnd_data
-                                            .set_dropped(Some(entity_idx), Some(request_idx));
-                                    }
-
-                                    if request_btn_resp.clicked() {
-                                        states
-                                            .main_page
-                                            .selected_entity
-                                            .select_request(Some(entity_idx), request_idx);
-                                    };
-                                    if request_delete_resp.clicked() {
-                                        states
-                                            .main_page
-                                            .deletion_entity
-                                            .select_request(Some(entity_idx), request_idx);
-                                    }
-                                }
-                            });
-                        });
-                }
+            // Unfolding Collection folder if Drag over it for some time
+            if drop_is_changed {
+                *time_elapsed = 0;
+            } else {
+                *time_elapsed += 1;
             }
-            Entity::REQUEST(request) => {
-                let is_selected = states
-                    .main_page
-                    .selected_entity
-                    .request_is_selected(None, entity_idx);
 
-                // Draw Separator for drop place indication
-                self.update_drop_target(
-                    ui,
-                    states
-                        .main_page
-                        .dnd_data
-                        .is_drop_entity(None, Some(entity_idx)),
-                    states.main_page.dnd_data.is_dragged(),
-                    &states.style,
-                );
-
-                let (request_btn_resp, request_delete_resp) = self.update_request_entity(
-                    ui,
-                    &request.draft.name,
-                    &request.draft.method,
-                    &request.draft.protocol,
-                    request.is_changed,
-                    is_selected,
-                    false,
-                    states.style.clone(),
-                );
-
-                // Settings dragged item
-                if request_btn_resp.drag_started() {
-                    states
-                        .main_page
-                        .dnd_data
-                        .set_dragged(None, Some(entity_idx));
-                }
-
-                // If DDragged setting this entity as drop target
-                if request_btn_resp.contains_pointer() && states.main_page.dnd_data.is_dragged() {
-                    states
-                        .main_page
-                        .dnd_data
-                        .set_dropped(None, Some(entity_idx));
-                }
-
-                if request_btn_resp.clicked() {
-                    states
-                        .main_page
-                        .selected_entity
-                        .select_request(None, entity_idx);
-                }
-
-                if request_delete_resp.clicked() {
-                    states
-                        .main_page
-                        .deletion_entity
-                        .select_request(None, entity_idx);
-                }
+            if collection.is_folded && *time_elapsed == 60 {
+                collection.is_folded = false;
+                *time_elapsed = 0;
             }
+        }
+
+        if folder_btn_resp.clicked() {
+            states
+                .main_page
+                .selected_entity
+                .select_collection(collection_idx);
+        };
+        if folder_btn_resp.double_clicked() {
+            collection.is_folded = !collection.is_folded;
+        };
+        if delete_btn_resp.clicked() {
+            states
+                .main_page
+                .deletion_entity
+                .select_collection(collection_idx);
+        };
+
+        self.update_collection_content(ui, collection_idx, states);
+    }
+
+    /// Draw collection content when unfolded
+    fn update_collection_content(&self, ui: &mut Ui, collection_idx: usize, states: &mut States) {
+        let collection = match states.main_page.entities[collection_idx].as_collection_mut() {
+            Some(val) => val,
+            None => return,
+        };
+
+        if collection.is_folded {
+            return;
+        }
+
+        let requests_idxs = states
+            .main_page
+            .filtered_entities
+            .collection_requests_idxs(collection_idx);
+
+        if requests_idxs.is_none() {
+            return;
+        };
+
+        let requests_idxs = requests_idxs.unwrap();
+
+        if requests_idxs.len() == 0 {
+            let empty_space_button = Button::selectable(
+                false,
+                RichText::new("no items").color(states.style.color_light()),
+            )
+            .min_size(vec2(ui.available_width() - 30., 15.))
+            .corner_radius(CornerRadius::ZERO)
+            .sense(Sense::click_and_drag())
+            .image_tint_follows_text_color(true)
+            .sense(Sense::DRAG);
+
+            self.update_drop_target(
+                ui,
+                states
+                    .main_page
+                    .dnd_data
+                    .is_drop_entity(Some(collection_idx), Some(0)),
+                states.main_page.dnd_data.is_dragged(),
+                &states.style,
+            );
+
+            let empty_space_button = Frame::new()
+                .fill(states.style.color_secondary())
+                .show(ui, |ui| {
+                    ui.with_layout(Layout::top_down_justified(Align::Center), |ui| {
+                        ui.add(empty_space_button)
+                    })
+                })
+                .inner
+                .inner;
+
+            if empty_space_button.contains_pointer() && states.main_page.dnd_data.is_dragged() {
+                states
+                    .main_page
+                    .dnd_data
+                    .set_dropped(Some(collection_idx), Some(0));
+            }
+        }
+
+        Frame::new()
+            .fill(states.style.color_secondary())
+            .show(ui, |ui| {
+                ui.indent(format!("collection-{}-reqeusts", collection_idx), |ui| {
+                    for request_idx in requests_idxs {
+                        let is_selected = states
+                            .main_page
+                            .selected_entity
+                            .request_is_selected(Some(collection_idx), request_idx);
+
+                        let request = &collection.requests[request_idx];
+
+                        self.update_drop_target(
+                            ui,
+                            states
+                                .main_page
+                                .dnd_data
+                                .is_drop_entity(Some(collection_idx), Some(request_idx)),
+                            states.main_page.dnd_data.is_dragged(),
+                            &states.style,
+                        );
+
+                        let (request_btn_resp, request_delete_resp) = self.update_request_item(
+                            ui,
+                            &request.draft.name,
+                            &request.draft.method,
+                            &request.draft.protocol,
+                            request.is_changed,
+                            is_selected,
+                            true,
+                            states.style.clone(),
+                        );
+
+                        if request_btn_resp.drag_started() {
+                            states
+                                .main_page
+                                .dnd_data
+                                .set_dragged(Some(collection_idx), Some(request_idx));
+                        };
+
+                        if request_btn_resp.contains_pointer()
+                            && states.main_page.dnd_data.is_dragged()
+                        {
+                            states
+                                .main_page
+                                .dnd_data
+                                .set_dropped(Some(collection_idx), Some(request_idx));
+                        }
+
+                        if request_btn_resp.clicked() {
+                            states
+                                .main_page
+                                .selected_entity
+                                .select_request(Some(collection_idx), request_idx);
+                        };
+                        if request_delete_resp.clicked() {
+                            states
+                                .main_page
+                                .deletion_entity
+                                .select_request(Some(collection_idx), request_idx);
+                        }
+                    }
+                });
+            });
+    }
+
+    /// Draw requeus item
+    fn update_request(&self, ui: &mut Ui, request_idx: usize, states: &mut States) {
+        let request = match states.main_page.entities[request_idx].as_request_mut() {
+            Some(val) => val,
+            None => return,
+        };
+        let is_selected = states
+            .main_page
+            .selected_entity
+            .request_is_selected(None, request_idx);
+
+        // Draw Separator for drop place indication
+        self.update_drop_target(
+            ui,
+            states
+                .main_page
+                .dnd_data
+                .is_drop_entity(None, Some(request_idx)),
+            states.main_page.dnd_data.is_dragged(),
+            &states.style,
+        );
+
+        let (request_btn_resp, request_delete_resp) = self.update_request_item(
+            ui,
+            &request.draft.name,
+            &request.draft.method,
+            &request.draft.protocol,
+            request.is_changed,
+            is_selected,
+            false,
+            states.style.clone(),
+        );
+
+        // Settings dragged item
+        if request_btn_resp.drag_started() {
+            states
+                .main_page
+                .dnd_data
+                .set_dragged(None, Some(request_idx));
+        }
+
+        // If DDragged setting this entity as drop target
+        if request_btn_resp.contains_pointer() && states.main_page.dnd_data.is_dragged() {
+            states
+                .main_page
+                .dnd_data
+                .set_dropped(None, Some(request_idx));
+        }
+
+        if request_btn_resp.clicked() {
+            states
+                .main_page
+                .selected_entity
+                .select_request(None, request_idx);
+        }
+
+        if request_delete_resp.clicked() {
+            states
+                .main_page
+                .deletion_entity
+                .select_request(None, request_idx);
+        }
+    }
+
+    pub fn update(
+        &self,
+        ui: &mut Ui,
+        entity_idx: usize,
+        states: &mut States,
+        time_elapsed: &mut usize,
+    ) {
+        ui.style_mut().spacing.item_spacing = vec2(0., 0.);
+        if states.main_page.entities[entity_idx].is_collection() {
+            self.update_collection(ui, entity_idx, states, time_elapsed);
+        };
+        if states.main_page.entities[entity_idx].is_request() {
+            self.update_request(ui, entity_idx, states);
         };
 
         self.update_drop(ui, states);
@@ -386,7 +477,7 @@ impl VisualEntity {
 
     /// Draw request  item
     /// Return tuplet: (folder_btn, delete_btn) of responses
-    fn update_request_entity(
+    fn update_request_item(
         &self,
         ui: &mut Ui,
         request_text: &String,
@@ -461,7 +552,7 @@ impl VisualEntity {
 
     /// Draw collection folder item
     /// Return tuplet: (fold_btn, folder_btn, delete_btn) of responses
-    fn update_collection_entity(
+    fn update_collection_item(
         &self,
         ui: &mut Ui,
         is_folded: bool,
@@ -471,7 +562,7 @@ impl VisualEntity {
         style: Style,
     ) -> (Response, Response, Response) {
         ui.with_layout(Layout::top_down_justified(Align::LEFT), |ui| {
-            return ui
+            let result = ui
                 .horizontal(|ui| {
                     ui.style_mut().spacing.item_spacing = vec2(0., 0.);
                     ui.style_mut().spacing.button_padding = vec2(5., 8.);
@@ -535,6 +626,24 @@ impl VisualEntity {
                     );
                 })
                 .inner;
+
+            // If Collection unfolded draw shadow-like separator
+            if !is_folded {
+                ui.style_mut().spacing.item_spacing = vec2(0., 0.);
+
+                let color = Color32::BLACK.linear_multiply(0.2);
+
+                Frame::new()
+                    .outer_margin(Margin::same(1))
+                    .fill(color)
+                    .show(ui, |ui| {
+                        ui.style_mut().visuals.widgets.noninteractive.bg_stroke =
+                            Stroke::new(0., color);
+                        ui.separator();
+                    });
+            }
+
+            result
         })
         .inner
     }
@@ -635,123 +744,11 @@ impl VisualEntity {
         ui.ctx().input(|r| {
             if r.pointer.button_released(egui::PointerButton::Primary) {
                 states.main_page.dnd_data.finalize();
-                // let target_request_idx = states.main_page.drop_target.request_idx;
-                // let target_collection_idx = states.main_page.drop_target.collection_idx;
-
-                // let drag_request_idx = states.main_page.dragged_entity.request_idx;
-                // let drag_collection_idx = states.main_page.dragged_entity.collection_idx;
-
-                // // If Drag dropped over it self we dont do anything
-                // if target_request_idx == drag_request_idx
-                //     && target_collection_idx == drag_collection_idx
-                // {
-                //     states.main_page.clear_dnd_data();
-                //     return;
-                // }
-
-                // // if we drag inside same collection. And Dragged Item over Next item - we dont do anything.
-                // // Since element always inserted before Target(Drop) Entity - we at same place
-                // if (target_collection_idx.is_some() && drag_collection_idx.is_some())
-                //     && (target_collection_idx == drag_collection_idx)
-                //     && target_request_idx.is_some()
-                //     && drag_request_idx.is_some()
-                // {
-                //     let target_request_idx = target_request_idx.unwrap();
-                //     let drag_request_idx = drag_request_idx.unwrap();
-                //     if drag_request_idx == target_request_idx - 1 {
-                //         states.main_page.clear_dnd_data();
-                //         return;
-                //     }
-                // }
-
-                // // Getting Target Entity index in root level
-                // let target_root_idx =
-                //     if target_request_idx.is_some() && target_collection_idx.is_none() {
-                //         target_request_idx.unwrap()
-                //     } else if target_request_idx.is_none() && target_collection_idx.is_some() {
-                //         target_collection_idx.unwrap()
-                //     } else {
-                //         states.main_page.clear_dnd_data();
-                //         return;
-                //     };
-
-                // // Getting Dragged Entity index in root level
-                // let dragged_root_idx =
-                //     if drag_request_idx.is_some() && drag_collection_idx.is_none() {
-                //         drag_request_idx.unwrap()
-                //     } else if drag_request_idx.is_none() && drag_collection_idx.is_some() {
-                //         drag_collection_idx.unwrap()
-                //     } else {
-                //         states.main_page.clear_dnd_data();
-                //         return;
-                //     };
-                // // If Dragged Entity dropped over NEXT Entity - dont do anything
-                // if dragged_root_idx == target_root_idx - 1 {
-                //     states.main_page.clear_dnd_data();
-                //     return;
-                // }
-
-                // let removed_entity = if drag_collection_idx.is_some() && drag_request_idx.is_some()
-                // {
-                //     let drag_collection_idx = drag_collection_idx.unwrap();
-                //     let drag_request_idx = drag_request_idx.unwrap();
-
-                //     if let Entity::COLLECTION(collection) =
-                //         &mut states.main_page.entities[drag_collection_idx]
-                //     {
-                //         Entity::REQUEST(collection.requests.remove(drag_request_idx))
-                //     } else {
-                //         states.main_page.clear_dnd_data();
-                //         return;
-                //     }
-                // } else if drag_collection_idx.is_none() && drag_request_idx.is_some() {
-                //     let drag_request_idx = drag_request_idx.unwrap();
-
-                //     states.main_page.entities.remove(drag_request_idx)
-                // } else if drag_collection_idx.is_some() && drag_request_idx.is_none() {
-                //     let drag_collection_idx = drag_collection_idx.unwrap();
-
-                //     states.main_page.entities.remove(drag_collection_idx)
-                // } else {
-                //     states.main_page.clear_dnd_data();
-                //     return;
-                // };
-
-                // if target_collection_idx.is_some() && target_request_idx.is_some() {
-                //     let target_collection_idx = target_collection_idx.unwrap();
-                //     let target_request_idx = target_request_idx.unwrap();
-
-                //     if let Entity::COLLECTION(collection) =
-                //         &mut states.main_page.entities[target_collection_idx]
-                //     {
-                //         if let Entity::REQUEST(removed_request) = removed_entity {
-                //             collection
-                //                 .requests
-                //                 .insert(target_request_idx, removed_request);
-                //         }
-                //     }
-                // } else if target_collection_idx.is_none() && target_request_idx.is_some() {
-                //     let target_request_idx = target_request_idx.unwrap();
-                //     states
-                //         .main_page
-                //         .entities
-                //         .insert(target_request_idx, removed_entity);
-                // } else if target_collection_idx.is_some() && target_request_idx.is_none() {
-                //     let target_collection_idx = target_collection_idx.unwrap();
-                //     states
-                //         .main_page
-                //         .entities
-                //         .insert(target_collection_idx, removed_entity);
-                // } else {
-                //     states.main_page.clear_dnd_data();
-                //     return;
-                // }
-
-                // states.main_page.clear_dnd_data();
             }
         });
     }
 
+    /// Draw dragget item
     fn update_dragged(&self, ui: &mut Ui, states: &mut States) {
         if states.main_page.dnd_data.is_dragged() {
             let pointer_pos = match ui.ctx().pointer_hover_pos() {
@@ -779,24 +776,6 @@ impl VisualEntity {
                 states.style.color_secondary(),
             );
 
-            // let selected_text = if states.main_page.dragged_entity.request_idx.is_some() {
-            //     states
-            //         .main_page
-            //         .dragged_request()
-            //         .unwrap()
-            //         .draft
-            //         .name
-            //         .clone()
-            // } else {
-            //     states
-            //         .main_page
-            //         .dragged_collection()
-            //         .unwrap()
-            //         .draft
-            //         .name
-            //         .clone()
-            // };
-
             if let Some(selected_text) = states.main_page.get_dragged_entity_text() {
                 painter.text(
                     pointer_pos,
@@ -821,12 +800,6 @@ impl VisualEntity {
             return;
         }
 
-        // let current_is_selected = match current_request_idx {
-        //     Some(r_idx) => drop_target.request_is_selected(current_collection_idx, r_idx),
-        //     None => drop_target.collection_is_selected(current_collection_idx.unwrap()),
-        // };
-
-        // if current_is_selected {
         Frame::new()
             .fill(style.color_lighter())
             .inner_margin(Margin::same(1))

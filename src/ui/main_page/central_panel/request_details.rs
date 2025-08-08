@@ -93,14 +93,15 @@ impl RequestDetailsPanel {
                 ui.add_space(10.);
 
                 // Select view of request part
-                let request = states.main_page.selected_request().unwrap();
-                match request.visible_details {
-                    RequestDetails::Header => self.update_headers(ui, states),
-                    RequestDetails::Body => self.update_body(ui, states),
-                    RequestDetails::QueryParams => self.update_query_params(ui, states),
-                    RequestDetails::Message => self.update_message(ui, states),
-                    RequestDetails::Setup => self.update_setup(ui, states),
-                };
+                if let Some(request) = states.main_page.selected_request() {
+                    match request.visible_details {
+                        RequestDetails::Header => self.update_headers(ui, states),
+                        RequestDetails::Body => self.update_body(ui, states),
+                        RequestDetails::QueryParams => self.update_query_params(ui, states),
+                        RequestDetails::Message => self.update_message(ui, states),
+                        RequestDetails::Setup => self.update_setup(ui, states),
+                    };
+                }
             })
         });
     }

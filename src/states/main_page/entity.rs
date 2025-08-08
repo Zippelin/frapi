@@ -39,4 +39,18 @@ impl Entity {
             Entity::REQUEST(_) => true,
         }
     }
+
+    pub fn as_collection_mut(&mut self) -> Option<&mut Collection> {
+        match self {
+            Entity::COLLECTION(collection) => Some(collection),
+            Entity::REQUEST(_) => None,
+        }
+    }
+
+    pub fn as_request_mut(&mut self) -> Option<&mut Request> {
+        match self {
+            Entity::COLLECTION(_) => None,
+            Entity::REQUEST(request) => Some(request),
+        }
+    }
 }

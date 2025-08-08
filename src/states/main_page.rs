@@ -119,9 +119,22 @@ impl DnDEntity {
     }
 
     /// setting Drop entity
-    pub fn set_dropped(&mut self, collection_idx: Option<usize>, request_idx: Option<usize>) {
+    /// returns bool flag means - drop target is changed from prev
+    pub fn set_dropped(
+        &mut self,
+        collection_idx: Option<usize>,
+        request_idx: Option<usize>,
+    ) -> bool {
+        let is_changed = if self.dropped.collection_idx != collection_idx
+            || self.dropped.request_idx != request_idx
+        {
+            true
+        } else {
+            false
+        };
         self.dropped.collection_idx = collection_idx;
         self.dropped.request_idx = request_idx;
+        is_changed
     }
 
     /// checking if we currently draggin Entity
@@ -129,7 +142,7 @@ impl DnDEntity {
         self.dragged.is_selected() && !self.is_final
     }
 
-    /// checking if move need. to be perform
+    /// checking if move need to be perform
     pub fn is_move_needed(&self) -> bool {
         if !self.is_final {
             return false;
@@ -141,10 +154,6 @@ impl DnDEntity {
         let drag_request_idx = self.dragged.request_idx;
         let drag_collection_idx = self.dragged.collection_idx;
 
-        // println!(
-        //     "{}",
-        //     drop_request_idx == drag_request_idx && drop_collection_idx == drag_collection_idx
-        // );
         // Move from on it self
         if drop_request_idx == drag_request_idx && drop_collection_idx == drag_collection_idx {
             return false;
@@ -635,10 +644,16 @@ impl MainPage {
     /// Get state of changes in selected entity
     pub fn entity_is_changed(&self) -> bool {
         if self.is_collection_selected() {
-            return self.selected_collection().unwrap().is_changed;
+            return match self.selected_collection() {
+                Some(val) => val.is_changed,
+                None => false,
+            };
         };
         if self.is_request_selected() {
-            return self.selected_request().unwrap().is_changed;
+            return match self.selected_request() {
+                Some(val) => val.is_changed,
+                None => false,
+            };
         };
         false
     }
@@ -668,10 +683,12 @@ impl MainPage {
     /// Try to move based on Drag and Drop data
     pub fn update_dnd(&mut self) -> bool {
         if !self.dnd_data.is_move_needed() {
+            if self.dnd_data.is_finalized() {
+                self.dnd_data.clear();
+            }
             return false;
         }
 
-        // println!("need move");
         let drop_request_idx = self.dnd_data.dropped.request_idx;
         let drop_collection_idx = self.dnd_data.dropped.collection_idx;
 
@@ -705,6 +722,7 @@ impl MainPage {
             self.entities.insert(drop_entity_idx, removed_entity);
             self.dnd_data.clear();
             self.drop_filter();
+            self.selected_entity.select_collection(drop_entity_idx);
             return true;
         }
 
@@ -736,6 +754,7 @@ impl MainPage {
             self.entities.insert(drop_entity_idx, removed_entity);
             self.dnd_data.clear();
             self.drop_filter();
+            self.selected_entity.select_request(None, drag_req_idx);
             return true;
         }
 
@@ -761,13 +780,15 @@ impl MainPage {
                     collection.requests.insert(drop_req_idx, request);
                     self.dnd_data.clear();
                     self.drop_filter();
+                    self.selected_entity
+                        .select_request(Some(drop_col_idx), drop_req_idx);
                     return true;
                 };
             }
             return false;
         }
 
-        // 4. If Dragging from Collection to Root
+        // 4. If Dragging Request from Collection to Root
         if drag_collection_idx.is_some()
             && drag_request_idx.is_some()
             && ((drop_collection_idx.is_some() && drop_request_idx.is_none())
@@ -793,10 +814,11 @@ impl MainPage {
             self.entities.insert(root_entity_idx, removed_entity);
             self.dnd_data.clear();
             self.drop_filter();
+            self.selected_entity.select_request(None, root_entity_idx);
             return true;
         }
 
-        // 5. Draggin from Collection to Different Collection
+        // 5. Draggin Request from Collection to Different Collection
         if drag_collection_idx.is_some()
             && drag_request_idx.is_some()
             && drop_collection_idx.is_some()
@@ -822,6 +844,8 @@ impl MainPage {
                     collection.requests.insert(drop_req_idx, request);
                     self.dnd_data.clear();
                     self.drop_filter();
+                    self.selected_entity
+                        .select_request(Some(drop_col_idx), drop_req_idx);
                     return true;
                 } else {
                     self.dnd_data.clear();
