@@ -699,7 +699,6 @@ impl MainPage {
 
         // 1. If Dragging Collection
         if drag_collection_idx.is_some() && drag_request_idx.is_none() {
-            // println!("1");
             // We cant move Collections inside collection, so taking ROOT index of reqeust or collection
             let drop_entity_idx = if drop_collection_idx.is_some() {
                 let mut drop_col_idx = drop_collection_idx.unwrap();
@@ -732,7 +731,6 @@ impl MainPage {
             && ((drop_collection_idx.is_none() && drop_request_idx.is_some())
                 || (drop_collection_idx.is_some() && drop_request_idx.is_none()))
         {
-            // println!("2");
             let drag_req_idx = drag_request_idx.unwrap();
 
             let drop_entity_idx = if drop_collection_idx.is_none() && drop_request_idx.is_some() {
@@ -764,7 +762,6 @@ impl MainPage {
             && drop_collection_idx.is_some()
             && drop_request_idx.is_some()
         {
-            // println!("3");
             let drag_req_idx = drag_request_idx.unwrap();
             let mut drop_col_idx = drop_collection_idx.unwrap();
             let drop_req_idx = drop_request_idx.unwrap();
@@ -794,7 +791,6 @@ impl MainPage {
             && ((drop_collection_idx.is_some() && drop_request_idx.is_none())
                 || (drop_collection_idx.is_none() && drop_request_idx.is_some()))
         {
-            // println!("4");
             let root_entity_idx = if drop_request_idx.is_some() {
                 drop_request_idx.unwrap()
             } else {
@@ -825,7 +821,6 @@ impl MainPage {
             && drop_request_idx.is_some()
             && drag_collection_idx.unwrap() != drop_collection_idx.unwrap()
         {
-            // println!("5");
             let drag_col_idx = drag_collection_idx.unwrap();
             let drag_req_idx = drag_request_idx.unwrap();
 
@@ -864,8 +859,6 @@ impl MainPage {
             && drop_request_idx.is_some()
             && drag_collection_idx.unwrap() == drop_collection_idx.unwrap()
         {
-            // println!("6");
-
             let drag_col_idx = drag_collection_idx.unwrap();
             let drag_req_idx = drag_request_idx.unwrap();
 
