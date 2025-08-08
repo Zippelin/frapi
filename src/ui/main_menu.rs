@@ -307,7 +307,7 @@ impl MainMenu {
                         );
 
                         ui.add_space(10.);
-                        ui.add(Label::new("Ver: 0.1.0").selectable(false));
+                        ui.add(Label::new(format!("Ver: {}",env!("CARGO_PKG_VERSION"))).selectable(false));
                         ui.add_space(10.);
                         ui.add(
                             Label::new(
