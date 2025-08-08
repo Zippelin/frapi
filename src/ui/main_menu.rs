@@ -221,20 +221,6 @@ impl MainMenu {
                                     );
                                 },
                             );
-
-                            if ui
-                                .button(
-                                    states
-                                        .style
-                                        .fonts
-                                        .menu_text("Toggle Right panel  ")
-                                        .color(states.style.color_main()),
-                                )
-                                .clicked()
-                            {
-                                states.main_page.right_panel_is_visible =
-                                    !states.main_page.right_panel_is_visible;
-                            };
                         },
                     );
 

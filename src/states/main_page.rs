@@ -20,6 +20,42 @@ pub mod request;
 pub mod response;
 pub mod selected_entity;
 
+/// Types of right panel
+#[derive(Debug, Clone, PartialEq)]
+pub enum RightPanelType {
+    EVENTS,
+}
+
+/// State of right panel bassed on user interraction
+#[derive(Debug, Clone)]
+pub struct RightPanel {
+    pub is_visible: bool,
+    pub panel_type: RightPanelType,
+}
+
+impl Default for RightPanel {
+    fn default() -> Self {
+        Self {
+            is_visible: false,
+            panel_type: RightPanelType::EVENTS,
+        }
+    }
+}
+
+impl RightPanel {
+    pub fn toggle(&mut self) {
+        self.is_visible = !self.is_visible;
+    }
+
+    pub fn toggle_events(&mut self) {
+        if self.panel_type == RightPanelType::EVENTS {
+            self.is_visible = !self.is_visible;
+        } else {
+            self.panel_type = RightPanelType::EVENTS;
+        }
+    }
+}
+
 /// Request move target - used when need to transfer request between collections
 #[derive(Debug, Clone)]
 pub struct RequestMoveTarget {
@@ -44,6 +80,161 @@ impl RequestMoveTarget {
     }
 }
 
+/// Representation of drag and drop data.
+/// Contains 2 Entites - Source and Targed and flag `is_final` - means we made drop action and now can move data in structures
+#[derive(Debug, Clone)]
+pub struct DnDEntity {
+    dragged: SelectedEntity,
+    dropped: SelectedEntity,
+    is_final: bool,
+}
+
+impl DnDEntity {
+    pub fn new() -> Self {
+        Self {
+            dragged: SelectedEntity::new(),
+            dropped: SelectedEntity::new(),
+            is_final: false,
+        }
+    }
+
+    /// marking that DnD finalized and we can perform real data move
+    pub fn finalize(&mut self) {
+        self.is_final = true
+    }
+
+    /// cleaning all DnD data
+    pub fn clear(&mut self) {
+        self.dragged.unselect_collection();
+        self.dragged.unselect_request();
+        self.dropped.unselect_collection();
+        self.dropped.unselect_request();
+        self.is_final = false;
+    }
+
+    /// setting drag Entity
+    pub fn set_dragged(&mut self, collection_idx: Option<usize>, request_idx: Option<usize>) {
+        self.dragged.collection_idx = collection_idx;
+        self.dragged.request_idx = request_idx;
+    }
+
+    /// setting Drop entity
+    /// returns bool flag means - drop target is changed from prev
+    pub fn set_dropped(
+        &mut self,
+        collection_idx: Option<usize>,
+        request_idx: Option<usize>,
+    ) -> bool {
+        let is_changed = if self.dropped.collection_idx != collection_idx
+            || self.dropped.request_idx != request_idx
+        {
+            true
+        } else {
+            false
+        };
+        self.dropped.collection_idx = collection_idx;
+        self.dropped.request_idx = request_idx;
+        is_changed
+    }
+
+    /// checking if we currently draggin Entity
+    pub fn is_dragged(&self) -> bool {
+        self.dragged.is_selected() && !self.is_final
+    }
+
+    /// checking if move need to be perform
+    pub fn is_move_needed(&self) -> bool {
+        if !self.is_final {
+            return false;
+        }
+
+        let drop_request_idx = self.dropped.request_idx;
+        let drop_collection_idx = self.dropped.collection_idx;
+
+        let drag_request_idx = self.dragged.request_idx;
+        let drag_collection_idx = self.dragged.collection_idx;
+
+        // Move from on it self
+        if drop_request_idx == drag_request_idx && drop_collection_idx == drag_collection_idx {
+            return false;
+        };
+
+        // Move from Collection to Root Collection (before Collection)
+        if drop_collection_idx == drag_collection_idx
+            && drop_request_idx.is_none()
+            && drag_request_idx.is_some()
+        {
+            return true;
+        }
+        // Move from Collection to Root Collection
+        if drop_collection_idx != drag_collection_idx {
+            return true;
+        }
+
+        // Move from Root to Collection
+        if drop_collection_idx.is_some() & drag_collection_idx.is_none() {
+            return true;
+        }
+
+        // Move inside same Collection on Next Entity
+        if drop_collection_idx.is_some()
+            && drag_collection_idx.is_some()
+            && drop_collection_idx == drag_collection_idx
+            && drop_request_idx.is_some()
+            && drag_request_idx.is_some()
+        {
+            let drop_request_idx = drop_request_idx.unwrap();
+            let drag_request_idx = drag_request_idx.unwrap();
+            if drop_request_idx == drag_request_idx + 1 {
+                return false;
+            } else {
+                return true;
+            }
+        }
+
+        // move on Root Level
+        // Getting Target Entity index in root level
+        let drop_request_idx = if drop_request_idx.is_some() && drop_collection_idx.is_none() {
+            drop_request_idx.unwrap()
+        } else if drop_request_idx.is_none() && drop_collection_idx.is_some() {
+            drop_collection_idx.unwrap()
+        } else {
+            return false;
+        };
+
+        // Getting Dragged Entity index in root level
+        let drag_request_idx = if drag_request_idx.is_some() && drag_collection_idx.is_none() {
+            drag_request_idx.unwrap()
+        } else if drag_request_idx.is_none() && drag_collection_idx.is_some() {
+            drag_collection_idx.unwrap()
+        } else {
+            return false;
+        };
+        // If Dragged Entity dropped over NEXT Entity - dont do anything
+        if drop_request_idx == drag_request_idx + 1 {
+            return false;
+        }
+
+        return true;
+    }
+
+    pub fn is_drop_entity(
+        &self,
+        collection_idx: Option<usize>,
+        request_idx: Option<usize>,
+    ) -> bool {
+        if self.dropped.collection_idx == collection_idx && self.dropped.request_idx == request_idx
+        {
+            return true;
+        }
+        false
+    }
+
+    pub fn is_finalized(&self) -> bool {
+        self.is_final
+    }
+}
+
 /// Main Page States
 #[derive(Debug, Clone)]
 pub struct MainPage {
@@ -58,12 +249,14 @@ pub struct MainPage {
     pub deletion_entity: SelectedEntity,
     /// Filter string
     pub filter_text: String,
-    /// Description where to move entity
+    /// Description where to move entity - when selected from drop down menu on Details Page
     pub request_move_target: RequestMoveTarget,
     /// Styles and colors for UI theme
     pub style: Style,
     /// Visible or not right sided panel
-    pub right_panel_is_visible: bool,
+    pub right_panel: RightPanel,
+    /// Drag adn Drop Data about Entities
+    pub dnd_data: DnDEntity,
 }
 
 /// From Settings -> State
@@ -81,7 +274,8 @@ impl From<&Settings> for MainPage {
             filter_text: "".into(),
             request_move_target: RequestMoveTarget::new(),
             deletion_entity: SelectedEntity::new(),
-            right_panel_is_visible: false,
+            right_panel: RightPanel::default(),
+            dnd_data: DnDEntity::new(),
         }
     }
 }
@@ -179,6 +373,74 @@ impl MainPage {
             }
         }
     }
+
+    // /// Get currently dragged request
+    // pub fn dragged_request(&self) -> Option<&Request> {
+    //     if self.dragged_entity.request_idx.is_none() {
+    //         return None;
+    //     };
+
+    //     let request_idx = self.dragged_entity.request_idx.unwrap();
+    //     match self.dragged_entity.collection_idx {
+    //         Some(val) => {
+    //             if let Entity::COLLECTION(collection) = &self.entities[val] {
+    //                 return Some(&collection.requests[request_idx]);
+    //             } else {
+    //                 return None;
+    //             }
+    //         }
+    //         None => {
+    //             if let Entity::REQUEST(request) = &self.entities[request_idx] {
+    //                 return Some(&request);
+    //             } else {
+    //                 return None;
+    //             }
+    //         }
+    //     }
+    // }
+
+    /// Get text of Dragged Entity
+    pub fn get_dragged_entity_text(&self) -> Option<String> {
+        if !self.dnd_data.is_dragged() {
+            return None;
+        }
+
+        let request_idx = self.dnd_data.dragged.request_idx;
+        let collection_idx = self.dnd_data.dragged.collection_idx;
+
+        if let (Some(request_idx), Some(collection_idx)) = (request_idx, collection_idx) {
+            if let Entity::COLLECTION(collection) = &self.entities[collection_idx] {
+                return Some(collection.requests[request_idx].draft.name.clone());
+            } else {
+                return None;
+            }
+        } else if let Some(request_idx) = request_idx {
+            if let Entity::REQUEST(request) = &self.entities[request_idx] {
+                return Some(request.draft.name.clone());
+            } else {
+                return None;
+            }
+        } else if let Some(collection_idx) = collection_idx {
+            if let Entity::COLLECTION(collection) = &self.entities[collection_idx] {
+                return Some(collection.draft.name.clone());
+            } else {
+                return None;
+            }
+        } else {
+            return None;
+        }
+    }
+
+    // /// Get currently dragged collection
+    // pub fn dragged_collection(&self) -> Option<&Collection> {
+    //     if self.dragged_entity.collection_idx.is_none() {
+    //         return None;
+    //     };
+    //     match &self.entities[self.dragged_entity.collection_idx.unwrap()] {
+    //         Entity::COLLECTION(collection) => Some(&collection),
+    //         Entity::REQUEST(_) => None,
+    //     }
+    // }
 
     /// Get currently selected request as consistent id salt for UI salt
     pub fn selected_request_salt(&self) -> String {
@@ -281,6 +543,7 @@ impl MainPage {
     }
 
     /// Drop filter and regenerate idexes to display
+    /// Need ot called EEACXH time something changed in Entities list
     pub fn drop_filter(&mut self) {
         self.filter_text = "".into();
         self.apply_filter();
@@ -381,10 +644,16 @@ impl MainPage {
     /// Get state of changes in selected entity
     pub fn entity_is_changed(&self) -> bool {
         if self.is_collection_selected() {
-            return self.selected_collection().unwrap().is_changed;
+            return match self.selected_collection() {
+                Some(val) => val.is_changed,
+                None => false,
+            };
         };
         if self.is_request_selected() {
-            return self.selected_request().unwrap().is_changed;
+            return match self.selected_request() {
+                Some(val) => val.is_changed,
+                None => false,
+            };
         };
         false
     }
@@ -407,6 +676,212 @@ impl MainPage {
             self.move_selected_request_to_collection(requested_move);
             return true;
         };
+        false
+    }
+
+    // TODO: bug when try to move inside empty collection
+    /// Try to move based on Drag and Drop data
+    pub fn update_dnd(&mut self) -> bool {
+        if !self.dnd_data.is_move_needed() {
+            if self.dnd_data.is_finalized() {
+                self.dnd_data.clear();
+            }
+            return false;
+        }
+
+        let drop_request_idx = self.dnd_data.dropped.request_idx;
+        let drop_collection_idx = self.dnd_data.dropped.collection_idx;
+
+        let drag_request_idx = self.dnd_data.dragged.request_idx;
+        let drag_collection_idx = self.dnd_data.dragged.collection_idx;
+
+        let removed_entity: Entity;
+
+        // 1. If Dragging Collection
+        if drag_collection_idx.is_some() && drag_request_idx.is_none() {
+            // We cant move Collections inside collection, so taking ROOT index of reqeust or collection
+            let drop_entity_idx = if drop_collection_idx.is_some() {
+                let mut drop_col_idx = drop_collection_idx.unwrap();
+                let drag_col_idx = drag_collection_idx.unwrap();
+                if drop_col_idx > drag_col_idx {
+                    drop_col_idx -= 1;
+                }
+                drop_col_idx
+            } else {
+                let mut drop_req_idx = drop_request_idx.unwrap();
+                let drag_col_idx = drag_collection_idx.unwrap();
+                if drop_req_idx > drag_col_idx {
+                    drop_req_idx -= 1;
+                }
+                drop_req_idx
+            };
+
+            removed_entity = self.entities.remove(drag_collection_idx.unwrap());
+
+            self.entities.insert(drop_entity_idx, removed_entity);
+            self.dnd_data.clear();
+            self.drop_filter();
+            self.selected_entity.select_collection(drop_entity_idx);
+            return true;
+        }
+
+        // 2. If Draggin Request from Root to Roor
+        if drag_collection_idx.is_none()
+            && drag_request_idx.is_some()
+            && ((drop_collection_idx.is_none() && drop_request_idx.is_some())
+                || (drop_collection_idx.is_some() && drop_request_idx.is_none()))
+        {
+            let drag_req_idx = drag_request_idx.unwrap();
+
+            let drop_entity_idx = if drop_collection_idx.is_none() && drop_request_idx.is_some() {
+                let mut drop_req_idx = drop_request_idx.unwrap();
+                if drop_req_idx > drag_req_idx {
+                    drop_req_idx -= 1;
+                }
+                drop_req_idx
+            } else {
+                let mut drop_col_idx = drop_collection_idx.unwrap();
+                if drop_col_idx > drag_req_idx {
+                    drop_col_idx -= 1;
+                }
+                drop_col_idx
+            };
+
+            removed_entity = self.entities.remove(drag_req_idx);
+
+            self.entities.insert(drop_entity_idx, removed_entity);
+            self.dnd_data.clear();
+            self.drop_filter();
+            self.selected_entity.select_request(None, drag_req_idx);
+            return true;
+        }
+
+        // 3. If Draggin Request from Root to Collection
+        if drag_collection_idx.is_none()
+            && drag_request_idx.is_some()
+            && drop_collection_idx.is_some()
+            && drop_request_idx.is_some()
+        {
+            let drag_req_idx = drag_request_idx.unwrap();
+            let mut drop_col_idx = drop_collection_idx.unwrap();
+            let drop_req_idx = drop_request_idx.unwrap();
+
+            if drop_col_idx > drag_req_idx {
+                drop_col_idx -= 1;
+            }
+
+            removed_entity = self.entities.remove(drag_req_idx);
+
+            if let Entity::REQUEST(request) = removed_entity {
+                if let Entity::COLLECTION(collection) = &mut self.entities[drop_col_idx] {
+                    collection.requests.insert(drop_req_idx, request);
+                    self.dnd_data.clear();
+                    self.drop_filter();
+                    self.selected_entity
+                        .select_request(Some(drop_col_idx), drop_req_idx);
+                    return true;
+                };
+            }
+            return false;
+        }
+
+        // 4. If Dragging Request from Collection to Root
+        if drag_collection_idx.is_some()
+            && drag_request_idx.is_some()
+            && ((drop_collection_idx.is_some() && drop_request_idx.is_none())
+                || (drop_collection_idx.is_none() && drop_request_idx.is_some()))
+        {
+            let root_entity_idx = if drop_request_idx.is_some() {
+                drop_request_idx.unwrap()
+            } else {
+                drop_collection_idx.unwrap()
+            };
+
+            let drag_col_idx = drag_collection_idx.unwrap();
+            let drag_req_idx = drag_request_idx.unwrap();
+
+            if let Entity::COLLECTION(collection) = &mut self.entities[drag_col_idx] {
+                removed_entity = Entity::REQUEST(collection.requests.remove(drag_req_idx));
+            } else {
+                self.dnd_data.clear();
+                return false;
+            }
+
+            self.entities.insert(root_entity_idx, removed_entity);
+            self.dnd_data.clear();
+            self.drop_filter();
+            self.selected_entity.select_request(None, root_entity_idx);
+            return true;
+        }
+
+        // 5. Draggin Request from Collection to Different Collection
+        if drag_collection_idx.is_some()
+            && drag_request_idx.is_some()
+            && drop_collection_idx.is_some()
+            && drop_request_idx.is_some()
+            && drag_collection_idx.unwrap() != drop_collection_idx.unwrap()
+        {
+            let drag_col_idx = drag_collection_idx.unwrap();
+            let drag_req_idx = drag_request_idx.unwrap();
+
+            let drop_col_idx = drop_collection_idx.unwrap();
+            let drop_req_idx = drop_request_idx.unwrap();
+
+            if let Entity::COLLECTION(collection) = &mut self.entities[drag_col_idx] {
+                removed_entity = Entity::REQUEST(collection.requests.remove(drag_req_idx))
+            } else {
+                self.dnd_data.clear();
+                return false;
+            }
+
+            if let Entity::COLLECTION(collection) = &mut self.entities[drop_col_idx] {
+                if let Entity::REQUEST(request) = removed_entity {
+                    collection.requests.insert(drop_req_idx, request);
+                    self.dnd_data.clear();
+                    self.drop_filter();
+                    self.selected_entity
+                        .select_request(Some(drop_col_idx), drop_req_idx);
+                    return true;
+                } else {
+                    self.dnd_data.clear();
+                    return false;
+                }
+            } else {
+                self.dnd_data.clear();
+                return false;
+            }
+        }
+
+        // 6. Draggin from Collection to Same Collection
+        if drag_collection_idx.is_some()
+            && drag_request_idx.is_some()
+            && drop_collection_idx.is_some()
+            && drop_request_idx.is_some()
+            && drag_collection_idx.unwrap() == drop_collection_idx.unwrap()
+        {
+            let drag_col_idx = drag_collection_idx.unwrap();
+            let drag_req_idx = drag_request_idx.unwrap();
+
+            let mut drop_req_idx = drop_request_idx.unwrap();
+
+            if let Entity::COLLECTION(collection) = &mut self.entities[drag_col_idx] {
+                let request = collection.requests.remove(drag_req_idx);
+
+                if drop_req_idx > drag_req_idx {
+                    drop_req_idx -= 1
+                }
+
+                collection.requests.insert(drop_req_idx, request);
+                self.dnd_data.clear();
+                self.drop_filter();
+                return true;
+            } else {
+                self.dnd_data.clear();
+                return false;
+            }
+        }
+
+        self.dnd_data.clear();
         false
     }
 
@@ -547,6 +1022,7 @@ impl MainPage {
                         self.drop_filter();
 
                         self.deletion_entity.unselect_request();
+
                         return true;
                     }
                     Entity::REQUEST(_) => return false,
@@ -622,4 +1098,12 @@ impl MainPage {
         }
         return "FREE".into();
     }
+
+    // /// Clearing DnD data
+    // pub fn clear_dnd_data(&mut self) {
+    //     self.dragged_entity.unselect_collection();
+    //     self.dragged_entity.unselect_request();
+    //     self.drop_target.unselect_collection();
+    //     self.drop_target.unselect_request();
+    // }
 }

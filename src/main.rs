@@ -15,7 +15,8 @@ pub struct Frapi {
     pub ui: UI,
 }
 
-// TODO: add served side abilities
+// TODO: add server side abilities
+// TODO: add drag and drop for entities list
 impl Frapi {
     pub fn new() -> Self {
         let settings = Settings::load();

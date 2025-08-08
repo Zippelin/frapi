@@ -55,7 +55,6 @@ impl Settings {
         match fs::exists(default_settings_path()) {
             Ok(is_exist) => {
                 if !is_exist {
-                    // println!("{:?}", fs::canonicalize(default_settings_path()));
                     fs::create_dir(default_settings_path()).unwrap()
                 }
             }

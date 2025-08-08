@@ -11,27 +11,27 @@ pub struct ThemeColors {
     pub warning: Color32,
 }
 
+// TODO: make more colors for various widgets
 impl ThemeColors {
     pub fn dark() -> Self {
         Self {
             main: Color32::from_hex("#212529").unwrap(),
             secondary: Color32::from_hex("#6c757d").unwrap(),
             danger: Color32::from_hex("#ee6c4d").unwrap(),
-            light: Color32::from_hex("#6c757d").unwrap(),
-            lighter: Color32::from_hex("#adb5bd").unwrap(),
+            light: Color32::from_hex("#848c94").unwrap(),
+            lighter: Color32::from_hex("#ccd4db").unwrap(),
             success: Color32::from_hex("#22BB33").unwrap(),
             warning: Color32::from_hex("#f0ad4e").unwrap(),
         }
     }
 
-    // TODO: добавить цвета светлой темы
     pub fn light() -> Self {
         Self {
-            main: Color32::from_hex("#e3d5ca").unwrap(),
-            secondary: Color32::from_hex("#68747c").unwrap(),
+            main: Color32::from_hex("#b0a8a2").unwrap(),
+            secondary: Color32::from_hex("#75716d").unwrap(),
             danger: Color32::from_hex("#F7A072").unwrap(),
-            light: Color32::from_hex("#edede9").unwrap(),
-            lighter: Color32::from_hex("#9d8189").unwrap(),
+            light: Color32::from_hex("#d1cbc5").unwrap(),
+            lighter: Color32::from_hex("#ede8e4").unwrap(),
             success: Color32::from_hex("#06d6a0").unwrap(),
             warning: Color32::from_hex("#EDDEA4").unwrap(),
         }

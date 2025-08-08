@@ -26,9 +26,7 @@ impl MainPage {
 
     pub fn update(&mut self, ctx: &Context, states: &mut States) {
         self.left_panel.update(ctx, states);
-        if states.main_page.right_panel_is_visible {
-            self.right_panel.update(ctx, states);
-        };
+        self.right_panel.update(ctx, states);
         self.central_panel.update(ctx, states);
     }
 }
